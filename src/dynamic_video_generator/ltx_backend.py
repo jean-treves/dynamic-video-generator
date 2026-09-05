@@ -64,8 +64,6 @@ MODEL_DIR = os.getenv("LTX_MODEL_DIR", "dgrauet/ltx-2.3-mlx-q4")
 MODE = os.getenv("LTX_MODE", "distilled")
 LOW_RAM = os.getenv("LTX_LOW_RAM", "1") not in {"0", "", "false", "no"}
 OUTPUT_DIR = Path(os.getenv("LTX_OUTPUT_DIR", "./ltx_outputs")).resolve()
-STATIC_HTML = Path(__file__).with_name("ltx_studio.html")
-
 # CLI mode flag → argv token. These mirror `ltx-2-mlx generate` exactly.
 MODE_FLAGS = {
     "distilled": "--distilled",       # fastest, 16 GB sweet-spot
@@ -319,10 +317,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
         if path in {"/", "/index.html", "/studio", "/studio.html"}:
-            if STATIC_HTML.exists():
-                self._send_file(STATIC_HTML, "text/html; charset=utf-8")
-            else:
-                self._send_json(404, {"error": f"missing UI file: {STATIC_HTML.name}"})
+            self._send_json(200, {
+                "service": "ltx-2-mlx backend",
+                "ui": "none here — the studio is served by the dvg proxy",
+                "routes": ["/health", "/jobs", "/jobs/<id>", "/outputs/<name>", "/generate"],
+            })
             return
         if path == "/health":
             self._send_json(200, {
