@@ -42,8 +42,22 @@ PACKS_DIR = Path(
     os.environ.get("PHOS_PACKS_DIR", Path(__file__).resolve().parents[2] / "packs")
 )
 
-#: Active pack ("" = none, bare engine).
+#: Active pack at import time ("" = none, bare engine). Read again in load():
+#: config.py imports this module 69 lines before it loads the .env, so a pack
+#: named only in .env was invisible here and every documented first run got the
+#: bare engine. Import order must not decide what the pack is.
 ACTIVE_PACK = os.environ.get("PHOS_PACK", "").strip()
+
+
+def _env_pack() -> str:
+    """The active pack id, read from the environment at call time."""
+    return os.environ.get("PHOS_PACK", ACTIVE_PACK).strip()
+
+
+def _env_packs_dir() -> Path:
+    """The pack root, read from the environment at call time."""
+    override = os.environ.get("PHOS_PACKS_DIR", "").strip()
+    return Path(override) if override else PACKS_DIR
 
 #: Engine routes: prompt name -> (HTTP route, log tag, UI label).
 BUILTIN_TRANSFORMS: dict[str, tuple[str, str, str]] = {
@@ -319,4 +333,7 @@ def load(pack_id: str | None = None, packs_dir: Path | None = None) -> PromptLib
     PromptLibrary
         A library ready to serve.
     """
-    return PromptLibrary(pack_id if pack_id is not None else ACTIVE_PACK, packs_dir)
+    return PromptLibrary(
+        pack_id if pack_id is not None else _env_pack(),
+        packs_dir or _env_packs_dir(),
+    )
