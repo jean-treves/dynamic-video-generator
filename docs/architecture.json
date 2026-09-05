@@ -44,7 +44,8 @@
         ],
         "note": "The tunnel publishes its URL; the client reads it back instead of being configured by hand."
       }
-    ]
+    ],
+    "animation": "trace"
   },
   "components": [
     {

@@ -19,7 +19,7 @@ models/
 checkpoints/
 loras/
 
-# ─── Sorties génératives ──────────────────────────────────────────────────
+# ─── Generated output ─────────────────────────────────────────────────────
 outputs/
 renders/
 *.mp4
@@ -31,14 +31,15 @@ renders/
 *.jpeg
 !docs/assets/*.png
 !docs/assets/*.jpg
+!docs/assets/*.gif
 !web/assets/*.png
 
-# ─── Packs de personas privés (seul `example` est versionné) ──────────────
+# ─── Private persona packs (only `example` is versioned) ──────────────────
 packs/*
 !packs/example/
 !packs/example/**
 
-# ─── Datasets d'entraînement ──────────────────────────────────────────────
+# ─── Training datasets ────────────────────────────────────────────────────
 clips/
 dataset/
 sheets/

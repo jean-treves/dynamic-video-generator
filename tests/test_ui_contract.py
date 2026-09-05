@@ -401,6 +401,9 @@ def test_permanently_dark_grounds_name_their_own_ink(name):
 #: labels and status strings reach the UI through /transforms.
 _SHIPPED = ("packs", "scripts", "docs", "src")
 
+#: Repository-root files that ship with the clone but sit in no folder above.
+_SHIPPED_ROOT = (".gitignore", ".env.example", "pyproject.toml", "README.md")
+
 
 def _shipped_files():
     root = Path(__file__).resolve().parent.parent
@@ -408,6 +411,10 @@ def _shipped_files():
         for path in sorted((root / folder).rglob("*")):
             if path.suffix in {".py", ".json", ".md", ".sh", ".txt"} and path.is_file():
                 yield path
+    for name in _SHIPPED_ROOT:
+        path = root / name
+        if path.is_file():
+            yield path
 
 
 def test_no_french_left_anywhere_shipped():

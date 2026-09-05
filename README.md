@@ -5,16 +5,15 @@ video backend (LTX-Video), an image generator (Draw Things) and a local LLM
 (Ollama) that rewrites prompts — with no cloud API calls, and without exposing
 the render machine to the internet.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.jpg">
-  <img alt="Architecture: the browser reaches one origin, the dvg proxy, which fronts LTX-Video, Draw Things and Ollama on loopback" src="docs/assets/architecture-light.jpg">
-</picture>
+[![Architecture: the browser reaches one origin, the dvg proxy, which fronts LTX-Video, Draw Things and Ollama on loopback](docs/assets/architecture.gif)](https://jean-treves.github.io/dynamic-video-generator/architecture.html)
 
 <sub>The browser only ever talks to the proxy, and the three engines never leave
 `127.0.0.1`. Dashed edges are the parts that are allowed to be missing: the tunnel,
 the style pack, and the fallback to the renders committed in the repository.
-[`docs/architecture.html`](docs/architecture.html) is the same diagram as an
-interactive page — open it locally for source links, guided views and tracing.</sub>
+**[Open the interactive diagram](https://jean-treves.github.io/dynamic-video-generator/architecture.html)**
+— guided views, relationship tracing, search, and PNG/SVG export. GitHub strips
+scripts from a README, so the animation above is a recording; the page behind it
+is the real thing.</sub>
 
 ![The generator, with the render backend switched off](docs/assets/generator-dark.jpg)
 
