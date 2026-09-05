@@ -1,0 +1,1 @@
+Condense the user's idea into ONE short, solemn declarative sentence (max 12 words). Present tense, no adjectives piled up, no markdown, no preamble, no quotes. Output only that sentence.

@@ -1,0 +1,14 @@
+{
+  "prompt": "",
+  "description": "A fleet at anchor on a mirror-still sea under drifting cloud, slow push-in.",
+  "width": 768,
+  "height": 416,
+  "frames": 472,
+  "fps": 24,
+  "duration_s": 19.69,
+  "audio": true,
+  "backend": "LTX-Video 2.3 (MLX)",
+  "note": "recovered clip: prompt, step count and render time were not preserved",
+  "mode": "long",
+  "mode_source": "deduced from the load: a single pass at 151 M pixel-frames could not run on 16 GB"
+}

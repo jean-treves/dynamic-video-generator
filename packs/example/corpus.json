@@ -1,0 +1,37 @@
+{
+  "banks": {
+    "subject": [
+      "a lone detective",
+      "a weary informant",
+      "a nightclub singer"
+    ],
+    "setting": [
+      "a rain-slicked alley",
+      "an empty hotel lobby",
+      "a shuttered diner at 3am"
+    ],
+    "light": [
+      "hard venetian-blind shadows",
+      "a single flickering streetlamp",
+      "cold neon spill"
+    ],
+    "camera": [
+      "slow push-in",
+      "locked static shot",
+      "gentle handheld drift"
+    ]
+  },
+  "presets": [
+    {
+      "id": "noir_street",
+      "label": "Street, night",
+      "template": "Cinematic shot of {subject} in {setting}, {light}, {camera}, 35mm black-and-white film grain, photoreal, shallow depth of field.",
+      "params": {
+        "width": 704,
+        "height": 416,
+        "frames": 97,
+        "quality": "standard"
+      }
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+# ─── Secrets ───────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*credentials*.json
+serviceAccount*.json
+
+# ─── Model weights (they live on the render machine, never here) ───────────
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.gguf
+*.mlpackage/
+models/
+checkpoints/
+loras/
+
+# ─── Sorties génératives ──────────────────────────────────────────────────
+outputs/
+renders/
+*.mp4
+*.mov
+*.webm
+*.gif
+*.png
+*.jpg
+*.jpeg
+!docs/assets/*.png
+!docs/assets/*.jpg
+!web/assets/*.png
+
+# ─── Packs de personas privés (seul `example` est versionné) ──────────────
+packs/*
+!packs/example/
+!packs/example/**
+
+# ─── Datasets d'entraînement ──────────────────────────────────────────────
+clips/
+dataset/
+sheets/
+
+# ─── Dépendances & builds ─────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+build/
+dist/
+.vercel/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+*.tsbuildinfo
+
+# ─── Artefacts de build ───────────────────────────────────────────────────
+web/dynamic_video_generator_app.html
+
+# ─── Artefacts de refonte / temporaires ───────────────────────────────────
+*.bak
+*.bak-*
+*.orig
+*.rej
+*.log
+/tmp/
+
+# ─── macOS / IDE ──────────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+
+# Images persisted by the proxy: host output, never versioned
+src/dynamic_video_generator/dt_images/
+
+# Demo renders are committed on purpose (see docs/demo/README.md); the wider
+# outputs rule above would otherwise sweep them up.
+!docs/demo/
+!docs/demo/*.mp4
+!docs/demo/*.mov
+!docs/demo/*.webm
+!docs/demo/*.jpg
+!docs/demo/*.png
+!docs/demo/*.json
+
+# ─── The community platform is a separate project, kept out of this repo ───
+community/
+docs/COMMUNITY_SPEC.md

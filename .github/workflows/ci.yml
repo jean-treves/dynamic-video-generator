@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --extra dev
+
+      # F821 is the one that earns its keep: the handler is split across
+      # mixins, so a lost import fails on the single route that uses it.
+      - name: Lint
+        run: uv run ruff check src/ tests/ tools/ scripts/
+
+      # Includes tests/test_no_lore.py, which fails if private universe
+      # content or a personal infrastructure identifier comes back in.
+      - name: Tests
+        run: uv run pytest -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The pages carry their JavaScript inline. An unescaped apostrophe in a
+      # UI string is enough to break a whole <script> block, and nothing else
+      # in the pipeline would catch it.
+      - name: Parse every inline <script> block
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, subprocess, sys, tempfile
+          fail = 0
+          with tempfile.TemporaryDirectory() as tmp:
+              for page in sorted(pathlib.Path("web").glob("*.html")):
+                  src = page.read_text(encoding="utf-8")
+                  blocks = re.findall(
+                      r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", src, re.S)
+                  for i, block in enumerate(blocks):
+                      f = pathlib.Path(tmp, f"{page.stem}_{i}.js")
+                      f.write_text(block, encoding="utf-8")
+                      r = subprocess.run(["node", "--check", str(f)],
+                                         capture_output=True, text=True)
+                      if r.returncode:
+                          fail = 1
+                          print(f"::error file={page}::block {i}: {r.stderr.strip()[:400]}")
+                  print(f"{page}: {len(blocks)} block(s)")
+          sys.exit(fail)
+          PY
+
+      - name: Shell scripts parse
+        run: bash -n scripts/start.sh && bash -n scripts/preflight.sh
+
+      # The bare engine must stay usable with no pack and no backend: this is
+      # the path a reviewer takes on a fresh clone.
+      - name: Bare engine boots and serves its pages in mock mode
+        run: |
+          uv run dvg --mock &
+          for _ in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8200/health && break
+            sleep 1
+          done
+          for route in / /doc /generator /gallery /storyboard /transforms /corpus; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8200$route")
+            echo "$route -> $code"
+            [ "$code" = "200" ] || exit 1
+          done

@@ -1,0 +1,2140 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dynamic Video Generator Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E🌅%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#05010f">
+<script>
+/* Icon helper for markup built in JS: ico('trash') -> an <svg><use>. */
+function ico(n,cls){return '<svg class="ico'+(cls?' '+cls:'')+'" aria-hidden="true"><use href="#i-'+n+'"/></svg>';}
+try{if(localStorage.getItem('phos_rail')==='mini')document.documentElement.classList.add('rail-mini')}catch(e){}</script>
+<script>
+/* Applied before the first paint: deciding the theme later means every load
+   flashes the wrong palette. Falls back to the OS preference. */
+try{var _t=localStorage.getItem('phos_theme');
+ if(!_t)_t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+ if(_t==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}
+/* Inside the shell the parent owns the choice and pushes it down. */
+window.addEventListener('message',function(e){
+ if(e.data&&e.data.type==='set-theme'){
+  if(e.data.theme==='light')document.documentElement.setAttribute('data-theme','light');
+  else document.documentElement.removeAttribute('data-theme');}});
+</script>
+<style>
+/* ═══ DYNAMIC VIDEO GENERATOR STUDIO — V2.0 « dusk » ═══
+   Restrained vaporwave: one primary accent (magenta) for selection + actions,
+   cyan = info/focus/data, amber = scores. Opaque surfaces, static background
+   (the animated blur(50px) aurora cost GPU during LTX renders). */
+:root{
+  /* Type scale. Before this there were nine sizes drifting between 9px and
+     13px with no relationship to each other; the floor is 10px because
+     uppercase micro-labels stop being legible below it on a laptop panel. */
+  --fs-2xs:10px; --fs-xs:11px; --fs-sm:12px; --fs-md:13px; --fs-lg:15px;
+  --fs-xl:18px; --fs-2xl:21px; --fs-3xl:24px; --fs-4xl:32px;
+
+  /* Ink is the text colour the theme paints with. Every neutral overlay
+     derives from it, so a light theme only has to flip this one value —
+     a hardcoded white veil is invisible on a light surface. */
+  --ink-rgb: 240,236,255;
+  --body-ink:#d9d3f0; --ex-ink:#c9e6f2; --ex-bad-ink:#f2c4cc; --out-ink:#dff7fc;
+  /* Status inks. These were hardcoded in the JS that writes them as inline
+     styles, so they beat every theme rule: the healthy green measured
+     1.13:1 on the light rail — effectively invisible. */
+  --ok-ink:rgba(128,255,208,.85); --warn-ink:#ffaa00; --bad-ink:#ff5050; --alert-ink:#ff9aa8;
+  /* Ink for grounds that stay dark in BOTH themes: a control floating over
+     a video frame cannot take --fg, which flips to near-black in light. */
+  --on-media:#f4f1ff; --on-media-dim:rgba(244,241,255,.72);
+  --toast-ok:#0d2f21; --toast-err:#330f1b; --toast-warn:#33210c;
+  --hl-line:rgba(255,209,102,.5); --hl-bg:rgba(255,209,102,.08); --hl-bg-hover:rgba(255,209,102,.16);
+  /* A fixed low-alpha accent reads as a tint on near-black and as nothing
+     on near-white; the chips need their own value per theme. */
+  --chip-bg:rgba(0,230,156,.08); --chip-bg-hover:rgba(0,230,156,.16);
+  --sunk: #0f0821;   /* recessed surfaces: inputs, tracks, wells */
+  --tint-violet:#dfb3ff; --tint-steel:#cfd8f4;
+  --shell: rgba(5,1,15,.88);  /* chrome: rail, sticky headers */
+  --field: #100923;  /* text inputs */
+  --disabled: #241844;
+/* ── Palette: one tint per pipeline stage ── */
+ --c-create:#c44dff;--c-limit:#00e69c;--c-render:#ff7a1a;--c-void:#05010f;--c-break:#ff3355;
+ --bg:var(--c-void);--surface:#150b2b;--surface2:#1c1136;--fg:#f4f1ff;--fg2:#b3abd6;--fg3:#8d84b8;
+ --accent:var(--c-create);--accent-ink:#1f0433;--accent2:var(--c-limit);--accent3:var(--c-render);--violet:#9d7bff;--red:var(--c-break);
+ --border:rgba(var(--ink-rgb),.1);--line2:rgba(var(--ink-rgb),.18);--panel:var(--surface);
+ --font-ui:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Segoe UI',sans-serif;--font-mono:'SF Mono',ui-monospace,Menlo,monospace;
+ --shadow-1:0 10px 30px -14px rgba(0,0,0,.55);--shadow-2:0 24px 60px -24px rgba(8,5,24,.85);
+ --grad-create:linear-gradient(115deg,var(--accent),var(--violet))}
+*{box-sizing:border-box}html{color-scheme:dark}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:var(--font-ui);-webkit-font-smoothing:antialiased}
+::selection{background:rgba(196,77,255,.35)}
+::placeholder{color:var(--fg3);opacity:1}
+:focus-visible{outline:2px solid var(--accent2);outline-offset:2px;border-radius:4px}
+input[type=range]{accent-color:var(--accent2)}
+input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(var(--ink-rgb),.14);border-radius:6px;border:2px solid var(--bg)}::-webkit-scrollbar-thumb:hover{background:rgba(var(--ink-rgb),.26)}
+body{display:flex;flex-direction:column;overflow:hidden}.top{flex:none}
+/* "dusk" background: magenta horizon + cyan zenith, static (no blur, no animation) */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+ background:repeating-linear-gradient(180deg,rgba(244,241,255,.016) 0 1px,transparent 1px 4px),radial-gradient(120% 90% at 50% 120%,rgba(196,77,255,.20),transparent 58%),radial-gradient(80% 55% at 88% -10%,rgba(0,230,156,.12),transparent 60%),radial-gradient(60% 45% at 8% 10%,rgba(255,46,166,.10),transparent 55%),radial-gradient(50% 40% at 70% 60%,rgba(255,122,26,.05),transparent 60%)}
+#dash,#imggen,#ltx,iframe,.top{position:relative;z-index:1}
+.top{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--shell);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);position:sticky;top:0;z-index:10;flex-wrap:wrap}
+.brand{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:var(--fs-md);letter-spacing:.22em;text-transform:uppercase;color:var(--fg);margin-right:4px}
+.orb{width:22px;height:22px;border-radius:50%;flex:none;color:var(--on-media);background:repeating-linear-gradient(180deg,transparent 0 3px,rgba(5,1,15,.85) 3px 4.5px) bottom/100% 52% no-repeat,linear-gradient(180deg,#ffd166 0%,#ff7a1a 40%,#ff2ea6 70%,#c44dff 100%);box-shadow:0 0 14px rgba(196,77,255,.45)}
+.tabs{display:flex;gap:4px;align-items:center;overflow-x:auto;scrollbar-width:none;max-width:100%;padding:2px}
+.tabs>.tab{flex:none;white-space:nowrap}
+.tabs::-webkit-scrollbar{display:none}
+.tab{font-family:var(--font-ui);font-size:var(--fs-sm);font-weight:600;letter-spacing:.02em;padding:8px 12px;border-radius:999px;cursor:pointer;background:transparent;border:1px solid transparent;color:var(--fg2);white-space:nowrap;transition:color .16s,background .16s,border-color .16s,transform .14s;display:inline-flex;align-items:center;gap:8px}
+.tab svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.tab:hover{color:var(--fg);background:rgba(var(--ink-rgb),.05);border-color:var(--border);transform:translateY(-1px)}
+.tab.active{background:rgba(196,77,255,.13);border-color:rgba(196,77,255,.5);color:var(--tint-violet);font-weight:700}
+.spacer{flex:1 1 auto}
+.iconbtn{font-family:var(--font-ui);font-size:var(--fs-sm);padding:4px 8px;border-radius:9px;cursor:pointer;background:rgba(var(--ink-rgb),.05);border:1px solid var(--border);color:var(--fg2);transition:color .16s,border-color .16s}
+.iconbtn:hover{color:var(--fg);border-color:var(--line2)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;background:#777;box-shadow:0 0 6px currentColor}
+.hl{font-size:var(--fs-xs);color:var(--fg2);display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:var(--font-mono)}
+.modelpick{font-family:var(--font-mono);font-size:var(--fs-xs);background:var(--surface);border:1px solid var(--border);color:var(--fg);border-radius:8px;padding:4px 8px;max-width:180px;transition:border-color .16s}
+.modelpick:focus:not(:focus-visible){outline:none;border-color:var(--accent2)}
+iframe{border:0;width:100%;flex:1 1 auto;min-height:0;display:none;background:var(--bg)}iframe.active{display:block}
+#dash{display:none;padding:16px;flex:1 1 auto;min-height:0;overflow:auto}#dash.active{display:block}
+.dhead{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.btn{font-family:var(--font-ui);font-size:var(--fs-sm);font-weight:700;letter-spacing:.01em;padding:8px 16px;border-radius:10px;cursor:pointer;border:1px solid transparent;color:var(--accent-ink);background:var(--accent);transition:transform .14s,box-shadow .18s,filter .18s;box-shadow:0 6px 18px -8px rgba(196,77,255,.55)}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.07);box-shadow:0 8px 24px -8px rgba(196,77,255,.6)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px;box-shadow:var(--shadow-1);transition:transform .18s,border-color .18s}
+.card:hover{border-color:var(--line2)}
+.card video{width:100%;border-radius:8px;background:#000;aspect-ratio:16/9}
+.cname{font-size:var(--fs-sm);word-break:break-all;margin:8px 0 4px;color:var(--fg2)}
+.score{font-size:var(--fs-2xl);font-weight:700;color:var(--accent3);font-variant-numeric:tabular-nums}
+.mrow{display:flex;align-items:center;gap:4px;font-size:var(--fs-2xs);letter-spacing:.03em;margin:4px 0}
+.mname{width:104px;text-transform:uppercase;color:var(--fg2);flex:0 0 auto}
+.bar{flex:1 1 auto;height:6px;border-radius:4px;background:rgba(var(--ink-rgb),.09);overflow:hidden}
+.bar>i{display:block;height:100%}.mval{width:26px;text-align:right;color:var(--fg2);flex:0 0 auto}
+.empty{color:var(--fg3);font-size:var(--fs-md);padding:40px 0;text-align:center}
+.load{font-family:var(--font-ui);font-size:var(--fs-sm);font-weight:600;padding:8px;border-radius:999px;border:1px solid rgba(0,230,156,.35);background:transparent;color:var(--accent2);cursor:pointer;width:100%;transition:background .16s,transform .14s}
+.load:hover{background:rgba(0,230,156,.1);transform:translateY(-1px)}
+#imggen{display:none;flex:1 1 auto;min-height:0;gap:16px;padding:16px}#imggen.active{display:flex}
+.ig-left{flex:0 0 420px;min-width:320px;overflow:auto;max-height:100%}
+.ig-right{flex:1 1 auto;min-width:0;overflow:auto;max-height:100%}
+/* Each heading owns an empty state, so none of them sits over a void. */
+.ig-right .empty{padding:20px 0;text-align:left}
+.ig-right .card img{aspect-ratio:16/9;object-fit:cover;color:var(--on-media)}
+.ig-right .card{display:flex;flex-direction:column}
+.ig-right .card .cname{flex:1 1 auto}
+.ig-right .grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.ig-right .grid>*{max-width:480px}
+@media(max-width:760px){#imggen{flex-direction:column;overflow:auto}.ig-left,.ig-right{flex:0 0 auto;max-height:none;width:100%}}
+#imggen textarea,#imggen input[type=number]{font-family:inherit;background:var(--sunk);border:1px solid var(--border);color:var(--fg);border-radius:8px;padding:8px 8px;width:100%;font-size:var(--fs-sm);transition:border-color .16s,box-shadow .16s}
+#imggen textarea:focus:not(:focus-visible),#imggen input[type=number]:focus:not(:focus-visible){outline:none;border-color:var(--accent2);box-shadow:0 0 0 3px rgba(0,230,156,.16)}
+#imggen textarea{min-height:54px;resize:vertical}
+#imggen label{display:block;font-size:var(--fs-xs);letter-spacing:.07em;text-transform:uppercase;color:var(--fg2);margin:8px 0 4px}
+.irow{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}.irow label{flex:1 1 64px;margin:0}
+.igrid{max-width:520px;margin-bottom:16px}
+.card img{width:100%;border-radius:8px;background:#000;display:block}
+.igbtns{display:flex;gap:8px;margin-top:8px}.igbtns>button{flex:1 1 0;width:auto}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+.chip{font-family:var(--font-ui);font-size:var(--fs-xs);font-weight:600;letter-spacing:.02em;padding:4px 12px;border-radius:999px;cursor:pointer;background:var(--chip-bg);border:1px solid rgba(0,230,156,.32);color:var(--accent2);transition:background .16s,transform .14s}
+.chip:hover{background:var(--chip-bg-hover);transform:translateY(-1px)}
+/* Image loading bar (Images tab) */
+.igprog{margin:8px 0 12px;max-width:520px}
+.igprog-bar{height:8px;border-radius:5px;background:rgba(var(--ink-rgb),.09);overflow:hidden}
+.igprog-bar>i{display:block;height:100%;width:0;background:var(--accent2);transition:width .15s}
+.igprog-txt{font-size:var(--fs-xs);color:var(--fg2);margin-top:4px;letter-spacing:.03em}
+/* Sequence tab (video generation through the Phosphene backend /queue/add -> /status) */
+#ltx{display:none;padding:16px;flex:1 1 auto;min-height:0;overflow:auto}
+#ltx.active{display:flex;flex-direction:column}
+#ltx .ltxgrid{flex:1 1 auto;min-height:340px}
+.ltxwhy{font-size:var(--fs-sm);line-height:1.6;color:var(--fg2);max-width:56ch;margin:0}
+.ltxhead{display:grid;grid-template-columns:minmax(0,56ch) minmax(0,1fr);gap:28px;align-items:start;margin:0 0 16px}
+.ltxpick{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+@media(max-width:1080px){.ltxhead{grid-template-columns:1fr;gap:12px}}
+.ltxwhy b{color:var(--fg)}
+.ltxmodes{display:flex;gap:8px;margin:0;flex-wrap:wrap}
+.ltxmode{font-family:var(--font-ui);font-size:var(--fs-sm);font-weight:600;letter-spacing:.02em;padding:8px 16px;border-radius:999px;cursor:pointer;background:transparent;border:1px solid var(--border);color:var(--fg2);transition:all .16s}
+.ltxmode:hover{color:var(--fg);border-color:var(--line2);transform:translateY(-1px)}
+.ltxmode.active{background:rgba(196,77,255,.13);border-color:rgba(196,77,255,.5);color:var(--tint-violet);font-weight:700}
+.ltxgrid{display:flex;gap:16px;flex-wrap:wrap;align-items:stretch}
+/* Empty space inside a bordered card reads as a fault; on the page ground it
+   reads as layout. So the form keeps its natural height and only the pane the
+   clip lands in takes the slack. */
+.ltxgrid>.card:first-child{align-self:flex-start}
+.ltxgrid>.card:last-child{display:flex;flex-direction:column}
+.ltxgrid>.card:last-child>#lxResult{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}
+.ltxgrid>.card{flex:1 1 360px;min-width:300px}
+#ltx textarea,#ltx input,#ltx select{font-family:inherit;background:var(--sunk);border:1px solid var(--border);color:var(--fg);border-radius:8px;padding:8px 8px;width:100%;font-size:var(--fs-sm);transition:border-color .16s,box-shadow .16s}
+#ltx textarea:focus:not(:focus-visible),#ltx input:focus:not(:focus-visible),#ltx select:focus:not(:focus-visible){outline:none;border-color:var(--accent2);box-shadow:0 0 0 3px rgba(0,230,156,.16)}
+#ltx textarea{min-height:96px;resize:vertical}  /* the prompt is the point of the page */
+#ltx label{display:block;font-size:var(--fs-xs);letter-spacing:.07em;text-transform:uppercase;color:var(--fg2);margin:8px 0 4px}
+#ltx .hint{font-size:var(--fs-xs);color:var(--fg3);margin:4px 0 2px;letter-spacing:.02em}
+#lxStatus{white-space:pre-wrap;font-size:var(--fs-xs);line-height:1.55;margin-top:8px;min-height:16px;font-family:ui-monospace,monospace}
+#lxResult video{width:100%;border-radius:8px;background:#000;display:block}
+/* Weekly top 10 (Dashboard tab) */
+.top10{margin:0 0 16px}
+.top10 h3{font-size:var(--fs-sm);letter-spacing:.1em;text-transform:uppercase;margin:0 0 8px;color:var(--accent3)}
+.top10 ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.t10{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px}
+.t10 .rk{font-size:var(--fs-xl);font-weight:700;color:var(--accent3);min-width:34px;text-align:center;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.t10 .t10b{flex:1 1 auto;min-width:0}
+.t10 .t10n{display:block;font-size:var(--fs-sm);word-break:break-all;color:var(--fg2)}
+.t10 .t10c{display:block;font-size:var(--fs-sm);color:var(--fg2);margin-top:2px;line-height:1.45}
+.t10 .t10s{font-size:var(--fs-lg);font-weight:700;color:var(--accent2);font-variant-numeric:tabular-nums;flex:0 0 auto}
+.t10 .t10n{color:var(--tint-steel);text-decoration:none}
+.t10 .t10n:hover{text-decoration:underline;color:var(--accent2)}
+.t10tab{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:70;display:flex;flex-direction:column;align-items:center;gap:4px;
+ font-family:inherit;font-size:var(--fs-lg);padding:12px 8px;border:1px solid var(--line2);border-left:0;border-radius:0 12px 12px 0;cursor:pointer;
+ background:var(--surface2);color:var(--accent3);box-shadow:var(--shadow-1)}
+.t10tab span{font-size:var(--fs-2xs);letter-spacing:.14em;writing-mode:vertical-rl;text-orientation:mixed;color:var(--fg2)}
+.t10tab:hover{background:var(--surface2);border-color:rgba(255,122,26,.4)}
+.t10drawer{position:fixed;left:-360px;top:0;bottom:0;width:340px;max-width:88vw;z-index:71;overflow:auto;
+ background:var(--panel);border-right:1px solid var(--line2);
+ box-shadow:6px 0 40px rgba(0,0,0,.5);transition:left .28s ease;padding:12px 12px 24px}
+.t10drawer.open{left:0}
+.t10head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;font-size:var(--fs-md);letter-spacing:.05em;color:var(--accent3)}
+.t10head button{font-family:inherit;font-size:var(--fs-lg);background:transparent;border:0;color:var(--fg2);cursor:pointer}
+.t10head button:hover{color:var(--fg)}
+.t10drawer ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.t10foot{margin-top:12px;font-size:var(--fs-2xs);color:var(--fg3);letter-spacing:.08em;text-transform:uppercase;text-align:center}
+/* Monitor (right side panel) + help modal: overlays */
+.ovl{position:fixed;inset:0;z-index:120;background:rgba(9,4,20,.72);color:var(--on-media);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center}
+.ovl.show{display:flex}
+.ovl-card{background:var(--surface);border:1px solid var(--line2);border-radius:16px;padding:20px 20px;max-width:440px;width:90vw;max-height:80vh;overflow:auto;box-shadow:var(--shadow-2)}
+.ovl-card h3{margin:0 0 12px;font-size:var(--fs-lg);letter-spacing:.04em;color:var(--accent2)}
+.ovl-card kbd{background:rgba(0,230,156,.12);border:1px solid rgba(0,230,156,.5);border-radius:4px;padding:2px 4px;font-size:var(--fs-xs);font-family:ui-monospace,monospace}
+.ovl-row{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:var(--fs-md);border-bottom:1px solid var(--border)}
+.monpanel{position:fixed;right:-340px;top:0;bottom:0;width:320px;max-width:88vw;z-index:115;overflow:auto;background:var(--panel);border-left:1px solid var(--line2);padding:16px 16px;transition:right .25s;box-shadow:-8px 0 40px rgba(0,0,0,.4)}
+.monpanel.open{right:0}
+.monpanel h3{margin:0 0 12px;font-size:var(--fs-md);letter-spacing:.04em;color:var(--accent3);display:flex;justify-content:space-between}
+.mraq{height:8px;border-radius:5px;background:rgba(var(--ink-rgb),.09);overflow:hidden;margin:4px 0 8px}
+.mraq>i{display:block;height:100%;background:var(--accent2)}
+.mon-x{font-family:inherit;font-size:var(--fs-xs);padding:4px 8px;border-radius:7px;cursor:pointer;background:rgba(255,51,85,.1);border:1px solid rgba(255,51,85,.45);color:var(--red)}
+.mon-x:hover{background:rgba(255,51,85,.22)}
+.mon-x:disabled{opacity:.5;cursor:default}
+.tl{display:flex;align-items:flex-end;gap:2px;height:60px;margin:8px 0}
+.tl-bar{flex:1;min-width:4px;background:var(--accent2);border-radius:2px 2px 0 0;opacity:.8}
+.tl-bar:hover{background:var(--accent3)}
+.lxedit{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0}
+.lxedit button{font-family:inherit;font-size:var(--fs-xs);padding:4px 8px;border-radius:7px;cursor:pointer;background:var(--chip-bg);border:1px solid rgba(0,230,156,.3);color:var(--accent2)}
+.vcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.vcard .vmedia{position:relative;aspect-ratio:16/9;background:#000;color:var(--on-media);display:flex;align-items:center;justify-content:center}
+.vcard video{width:100%;height:100%;object-fit:contain;background:#000}
+.vcard .vbody{padding:8px 12px;display:flex;flex-direction:column;gap:8px}
+.vtitle{font-size:var(--fs-md);color:var(--fg);font-weight:700;line-height:1.3}
+.vauthorrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.vauthor{font-size:var(--fs-sm);color:var(--accent2);cursor:pointer}
+.voff{font-size:var(--fs-sm);color:var(--fg2);padding:16px;text-align:center}
+.rrow{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.rbtn{font-family:inherit;font-size:var(--fs-sm);padding:4px 8px;border-radius:999px;cursor:pointer;border:1px solid var(--border);background:rgba(5,1,15,.5);color:var(--fg);display:inline-flex;gap:4px;align-items:center;transition:transform .08s}
+.rbtn:hover{transform:scale(1.06)}
+.rbtn.on{border-color:var(--accent)}
+.rbtn.r-spark.on{background:rgba(255,122,26,.16);border-color:var(--accent3)}
+.rbtn.r-vortex.on{background:var(--chip-bg-hover);border-color:var(--accent2)}
+.rbtn.r-blaze.on{background:rgba(196,77,255,.16);border-color:var(--accent)}
+.subbtn{font-family:inherit;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.05em;padding:4px 8px;border-radius:7px;cursor:pointer;border:1px solid rgba(0,230,156,.5);background:transparent;color:var(--accent2)}
+.subbtn.on{background:var(--accent2);color:#00332a;font-weight:700}
+.cmts{border-top:1px solid var(--border);margin-top:2px;padding-top:8px;display:none;flex-direction:column;gap:4px}
+.cmts.open{display:flex}
+.cmt{font-size:var(--fs-sm);line-height:1.45}.cmt b{color:var(--accent2)}
+.cmtform{display:flex;gap:4px}.cmtform input{flex:1;font-family:inherit;font-size:var(--fs-md);background:var(--sunk);border:1px solid var(--border);color:var(--fg);border-radius:8px;padding:4px 8px}
+.levelbar{height:10px;border-radius:6px;background:rgba(var(--ink-rgb),.08);overflow:hidden;margin:4px 0;max-width:420px}
+.levelbar>i{display:block;height:100%;background:var(--accent)}
+.trophies{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.trophy{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 8px;font-size:var(--fs-sm);min-width:130px}
+.trophy.locked{opacity:.4}.trophy b{display:block;color:var(--accent3);font-size:var(--fs-sm);margin-bottom:2px}
+.board{width:100%;border-collapse:collapse;font-size:var(--fs-md);max-width:640px}
+.board th,.board td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)}
+.board td.rk{color:var(--accent3);font-weight:700;width:44px}
+.board tr.me{background:rgba(196,77,255,.12)}
+#trinFx{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
+.fx-part{position:absolute;font-size:var(--fs-3xl);will-change:transform,opacity}
+@keyframes fx-rise{0%{transform:translateY(0) rotate(0);opacity:0}12%{opacity:1}100%{transform:translateY(-96vh) rotate(360deg);opacity:0}}
+@keyframes fx-warp{0%{opacity:0;transform:scale(.6);filter:hue-rotate(0deg)}25%{opacity:.75}100%{opacity:0;transform:scale(2.4);filter:hue-rotate(320deg)}}
+.fx-warp{position:absolute;inset:0;background:radial-gradient(circle at 50% 55%,rgba(196,77,255,.5),rgba(255,150,80,.3) 40%,transparent 70%);animation:fx-warp .9s ease-out forwards}
+.tsec{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:16px;max-width:760px}
+.tsec h4{margin:0 0 8px;font-size:var(--fs-sm);letter-spacing:.07em;text-transform:uppercase;color:var(--accent2)}
+.trow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rowitem{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:8px 8px;margin-bottom:8px;background:var(--sunk);font-size:var(--fs-md)}
+.rowitem .grow{flex:1 1 auto;min-width:0}
+.badge{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:6px;border:1px solid var(--border);white-space:nowrap}
+.badge.on{color:#5cefb0;border-color:rgba(102,240,184,.5)}
+.badge.off{color:var(--fg3);border-color:var(--border)}
+.badge.dis{color:var(--red);border-color:rgba(255,51,85,.5)}
+.clipgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.clipcard{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.clipcard .cthumb{aspect-ratio:16/9;background:#000 center/cover no-repeat;color:var(--on-media)}
+.clipcard .cmeta{padding:4px 8px;font-size:var(--fs-xs);display:flex;justify-content:space-between;align-items:center;gap:4px}
+.keypanel{background:rgba(102,240,184,.06);border:1px solid rgba(102,240,184,.4);border-radius:10px;padding:12px;margin-top:8px;max-width:640px}
+.keypanel pre{overflow-x:auto;background:var(--sunk);padding:8px;border-radius:6px;font-size:var(--fs-xs)}
+@keyframes fadeup{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.authhero{width:100%;background:var(--surface);border:1px solid var(--line2);border-radius:16px;padding:24px 24px;margin-bottom:8px}
+.ah-title{font-size:var(--fs-2xl);font-weight:700;letter-spacing:.03em}
+.ah-title span{color:var(--accent)}
+.ah-sub{font-size:var(--fs-md);color:var(--fg2);margin:4px 0 12px;max-width:560px;line-height:1.55}
+.ah-tabs{display:flex;gap:8px;margin-bottom:12px}
+.ah-tab{font-family:inherit;font-size:var(--fs-sm);letter-spacing:.03em;padding:8px 12px;border-radius:999px;cursor:pointer;background:transparent;border:1px solid rgba(0,230,156,.4);color:var(--accent2);transition:all .16s}
+.ah-tab.on{background:var(--accent2);color:#00332a;font-weight:700}
+.ah-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ah-in{padding:8px 12px;font-size:var(--fs-md);min-width:210px;transition:box-shadow .18s,border-color .18s}
+.ah-in:focus:not(:focus-visible){border-color:var(--accent2);box-shadow:0 0 0 3px rgba(0,230,156,.18);outline:none}
+.ah-go{padding:8px 16px;font-size:var(--fs-sm);transition:transform .15s,box-shadow .15s}
+.ah-go:hover{transform:translateY(-1px)}
+.ah-msg{width:100%;font-size:var(--fs-sm);min-height:14px}
+.ah-remember{display:inline-flex;align-items:center;gap:8px;font-size:var(--fs-xs);color:var(--fg2);cursor:pointer;white-space:nowrap;padding:4px 2px}
+.ah-remember input{accent-color:var(--accent2);cursor:pointer}
+.ah-remember:hover{color:var(--fg)}
+.ah-saved{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ah-saved-h{flex:1 1 100%;font-size:var(--fs-2xs);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2)}
+.ah-saved-h span{font-weight:400;letter-spacing:.02em;text-transform:none;color:var(--fg3)}
+.ah-acct{display:inline-flex;align-items:stretch;border:1px solid rgba(0,230,156,.32);border-radius:999px;overflow:hidden;background:rgba(0,230,156,.05);transition:border-color .16s}
+.ah-acct:hover{border-color:rgba(0,230,156,.6)}
+.ah-acct button{font-family:var(--font-ui);border:none;background:transparent;color:var(--accent2);cursor:pointer;padding:8px 12px;font-size:var(--fs-sm);font-weight:600}
+.ah-acct .ah-acct-go:hover{background:rgba(0,230,156,.14)}
+.ah-acct .ah-acct-eye{border-left:1px solid rgba(0,230,156,.2);padding:8px 8px;font-size:var(--fs-xs)}
+.ah-acct .ah-acct-eye:hover{background:rgba(0,230,156,.14)}
+.ah-acct .ah-acct-del{border-left:1px solid rgba(0,230,156,.2);padding:8px 8px;font-size:var(--fs-xs);color:var(--red)}
+.ah-acct .ah-acct-del:hover{background:rgba(255,51,85,.14)}
+.ah-av{width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:-6px;margin-right:4px;border:1px solid var(--accent2)}
+.vcard{transition:transform .18s,box-shadow .18s,border-color .18s}
+.vcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-1);border-color:var(--line2)}
+@keyframes shimmer{0%{background-position:-300px 0}100%{background-position:300px 0}}
+.skel .vmedia,.skline{background:linear-gradient(90deg,rgba(var(--ink-rgb),.04) 25%,rgba(var(--ink-rgb),.09) 50%,rgba(var(--ink-rgb),.04) 75%);background-size:600px 100%;animation:shimmer 1.2s infinite linear}
+.skline{height:11px;border-radius:5px;margin:8px 0}.skline.w60{width:60%}.skline.w40{width:40%}
+.tgrid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;align-items:start}
+@media(max-width:980px){.tgrid{grid-template-columns:1fr}}
+.tgrid .tsec{max-width:none}
+.taside .tsec{padding:12px 12px}
+.steps{list-style:none;margin:0;padding:0;font-size:var(--fs-sm)}
+.steps li{display:flex;gap:8px;margin-bottom:8px;line-height:1.55}
+.stepn{flex:none;width:18px;height:18px;border-radius:50%;background:rgba(196,77,255,.16);border:1px solid rgba(196,77,255,.5);color:var(--tint-violet);font-weight:700;font-size:var(--fs-2xs);display:flex;align-items:center;justify-content:center;margin-top:2px}
+.pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5cefb0;animation:pulse 1.6s infinite;vertical-align:1px}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(102,240,184,.6)}70%{box-shadow:0 0 0 7px rgba(102,240,184,0)}100%{box-shadow:0 0 0 0 rgba(102,240,184,0)}}
+.avprev{width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent2);background:#000;color:var(--on-media);display:block;margin-bottom:8px}
+.minirow{display:flex;gap:8px;align-items:center;font-size:var(--fs-sm);padding:4px 0;border-bottom:1px solid rgba(var(--ink-rgb),.05)}
+.minirow:last-child{border-bottom:none}
+.minirow .mt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ═══ DYNAMIC VIDEO GENERATOR v4 — component layer (native gallery, playlists, doc, tutor,
+   voice, frame studio, toasts). Tokens V2.0 « dusk ». ═══ */
+:root{--mut:var(--fg2);--viol:var(--violet);--mint:#66f0b8;--border2:rgba(196,77,255,.4);--r:14px;
+ --glow-a:0 8px 24px -10px rgba(196,77,255,.4);--glow-c:0 8px 24px -10px rgba(0,230,156,.35)}
+.view{position:relative;z-index:1}
+/* NOTE: no entry animation on the views — Safari freezes the timelines of
+   background tabs and a view would stay at opacity:0 (observed bug). */
+.view{display:none;padding:16px;flex:1 1 auto;min-height:0;overflow:auto}
+.view.active{display:block}
+#imggen.active{display:flex}
+#lxStatus,.igprog-txt,.cname,.hint{font-family:var(--font-mono)}
+/* toasts — solid border tinted per state (no side stripe) */
+.toasts{position:fixed;right:16px;bottom:16px;z-index:300;display:flex;flex-direction:column;gap:8px;max-width:min(380px,90vw)}
+.toast{padding:12px 12px;border-radius:12px;background:var(--surface2);font-size:var(--fs-md);line-height:1.5;color:var(--fg);
+ border:1px solid var(--line2);box-shadow:var(--shadow-1);animation:toastin .22s ease-out}
+.toast.ok{border-color:rgba(102,240,184,.55);background:var(--toast-ok);color:var(--fg)}
+.toast.err{border-color:rgba(255,51,85,.6);background:var(--toast-err);color:var(--fg)}
+.toast.warn{border-color:rgba(255,122,26,.55);background:var(--toast-warn);color:var(--fg)}
+@keyframes toastin{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+/* micro (voice) */
+.micwrap{position:relative}
+.mic{position:absolute;top:7px;right:7px;z-index:5;width:30px;height:30px;border-radius:99px;border:1px solid var(--line2);
+ background-color:var(--surface2);color:var(--fg);cursor:pointer;font-size:var(--fs-lg);line-height:1;display:flex;align-items:center;justify-content:center;
+ transition:all .15s}
+.mic:hover{border-color:var(--accent2);box-shadow:var(--glow-c)}
+.mic.rec{background:#ff2d55;border-color:#ff2d55;animation:micpulse 1.1s ease-in-out infinite;box-shadow:0 0 18px rgba(255,45,85,.7)}
+@keyframes micpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
+.miclang{position:absolute;top:11px;right:42px;z-index:5;font-size:var(--fs-2xs);letter-spacing:.06em;padding:2px 8px;border-radius:99px;
+ border:1px solid var(--line2);background:var(--surface2);color:var(--fg2);cursor:pointer;font-family:var(--font-mono)}
+.miclang:hover{color:var(--fg);border-color:var(--accent2)}
+/* KPI dashboard */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px}
+.kpi b{display:block;font-size:var(--fs-3xl);font-weight:800;font-variant-numeric:tabular-nums;color:var(--fg)}
+.kpi span{font-size:var(--fs-2xs);letter-spacing:.08em;text-transform:uppercase;color:var(--fg2)}
+.kpi small{display:block;font-size:var(--fs-2xs);color:var(--fg2);margin-top:2px;font-family:var(--font-mono)}
+.dtools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.dtools input[type=search],.gtools input[type=search]{background:var(--sunk);border:1px solid var(--border);color:var(--fg);
+ border-radius:10px;padding:8px 12px;font-size:var(--fs-md);min-width:200px;transition:border-color .16s,box-shadow .16s}
+.dtools input[type=search]:focus:not(:focus-visible),.gtools input[type=search]:focus:not(:focus-visible){outline:none;border-color:var(--accent2);box-shadow:0 0 0 3px rgba(0,230,156,.16)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:rgba(var(--ink-rgb),.03)}
+.seg button{border:0;background:transparent;color:var(--fg2);font-family:var(--font-ui);font-weight:600;font-size:var(--fs-xs);
+ letter-spacing:.02em;padding:8px 12px;cursor:pointer;transition:all .15s}
+.seg button:hover{color:var(--fg)}
+.seg button.on{background:rgba(196,77,255,.16);color:var(--tint-violet)}
+.tl2{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 12px;margin-bottom:16px}
+.tl2 .tlrow{display:flex;align-items:flex-end;gap:4px;height:64px;margin-top:8px}
+.tl2 .tlb{flex:1;min-width:5px;border-radius:4px 4px 0 0;background:rgba(0,230,156,.7);
+ transition:filter .15s;position:relative}
+.tl2 .tlb:hover{filter:brightness(1.35)}
+.tl2 .tll{display:flex;gap:4px;margin-top:4px}
+.tl2 .tll span{flex:1;text-align:center;font-size:var(--fs-2xs);color:var(--fg2);font-family:var(--font-mono)}
+.scorering{font-variant-numeric:tabular-nums;font-weight:800;font-size:var(--fs-2xl);color:var(--accent3)}
+/* native gallery */
+.gtools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;position:sticky;top:0;z-index:8;
+ background:var(--shell);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:8px;border-radius:var(--r);border:1px solid var(--border)}
+.ggrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.ggrid>*{max-width:560px}
+.gcard{padding:0;overflow:hidden;cursor:pointer}
+.gcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-1);border-color:var(--line2)}
+.gthumb{position:relative;aspect-ratio:16/9;background:#000;overflow:hidden;color:var(--on-media)}
+.gthumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
+.gcard:hover .gthumb img{transform:scale(1.05)}
+.gthumb .gph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--fs-4xl);opacity:.35;
+ background:linear-gradient(140deg,rgba(196,77,255,.12),rgba(0,230,156,.09))}
+.dot{display:inline-block;width:.55em;height:.55em;border-radius:50%;flex:none;vertical-align:.02em}
+.dot.ok{background:var(--accent2)}.dot.warn{background:var(--accent3)}.dot.bad{background:var(--c-break)}.dot.chained{background:var(--accent)}
+.cnote{font-size:var(--fs-xs);color:var(--fg2);line-height:1.5;display:block;max-width:52ch}
+.gbadge{position:absolute;top:8px;right:8px;font-size:var(--fs-xs);font-weight:800;padding:2px 8px;border-radius:99px;
+ background:rgba(15,8,31,.88);border:1px solid rgba(255,122,26,.5);color:var(--accent3);font-variant-numeric:tabular-nums}
+.gkind{position:absolute;top:8px;left:8px;font-size:var(--fs-xs);padding:2px 8px;border-radius:8px;background:rgba(15,8,31,.8);color:var(--on-media)}
+.gover{position:absolute;inset:auto 0 0 0;display:flex;gap:4px;justify-content:center;padding:8px;opacity:0;transform:translateY(6px);color:var(--on-media);
+ transition:all .2s;background:linear-gradient(0deg,rgba(12,6,26,.92),transparent)}
+.gcard:hover .gover,.gcard:focus-within .gover{opacity:1;transform:none}
+.gover button{border:1px solid var(--line2);background:rgba(20,12,41,.92);color:var(--on-media);border-radius:9px;min-width:32px;height:30px;
+ cursor:pointer;font-size:var(--fs-md);transition:all .14s}
+.gover button:hover{border-color:var(--accent2);background:var(--chip-bg-hover);transform:translateY(-2px)}
+.gmeta{padding:8px 12px}
+.gname{font-size:var(--fs-xs);font-family:var(--font-mono);word-break:break-all;line-height:1.4}
+.gsub{font-size:var(--fs-2xs);color:var(--fg2);margin-top:4px;font-family:var(--font-mono)}
+/* lightbox + frame studio */
+.lb-card{max-width:min(1080px,95vw);width:1080px}
+.lb-card video,.lb-card .lbimg{width:100%;max-height:60vh;border-radius:12px;background:#000;color:var(--on-media);display:block;object-fit:contain}
+.lbrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.lbprompt{font-family:var(--font-mono);font-size:var(--fs-sm);line-height:1.6;color:var(--tint-steel);background:var(--sunk);
+ border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin-top:8px;max-height:110px;overflow:auto;white-space:pre-wrap}
+.lbnav{position:absolute;top:50%;transform:translateY(-50%);font-size:var(--fs-2xl);width:44px;height:64px;border-radius:12px;cursor:pointer;
+ border:1px solid var(--line2);background:rgba(20,12,41,.88);color:var(--on-media);transition:all .15s}
+.lbnav:hover{border-color:var(--accent2);background:rgba(0,230,156,.14)}
+.lbnav.prev{left:-58px}.lbnav.next{right:-58px}
+@media(max-width:1240px){.lbnav.prev{left:8px}.lbnav.next{right:8px}}
+.fsrange{width:100%;margin:8px 0 4px}
+.fscap{display:flex;gap:12px;align-items:flex-start;margin-top:12px;flex-wrap:wrap}
+.fscap canvas{width:220px;max-width:40vw;border-radius:10px;border:1px solid rgba(0,230,156,.5);background:#000}
+.fstime{font-family:var(--font-mono);font-size:var(--fs-sm);color:var(--accent2);font-variant-numeric:tabular-nums}
+/* playlists */
+.plwrap{display:flex;gap:16px;align-items:stretch;flex:1 1 auto;min-height:0}
+#plists.active{display:flex;flex-direction:column}
+.plside{flex:0 0 262px;min-width:220px;display:flex;flex-direction:column;overflow:auto}
+.plmain{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;min-height:0}
+.plmain .plitems{flex:1 1 auto;align-content:start;overflow:auto}
+@media(max-width:900px){.plwrap{flex-wrap:wrap;align-items:flex-start}.plside{flex:1 1 100%}}
+.plrow{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:11px;cursor:pointer;border:1px solid transparent;
+ transition:all .14s;font-size:var(--fs-md)}
+.plrow:hover{background:rgba(var(--ink-rgb),.05);border-color:var(--border)}
+.plrow.on{background:rgba(196,77,255,.13);border-color:var(--border2)}
+.plrow .plemo{font-size:var(--fs-lg);flex:0 0 auto}
+.plrow .pln{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.plrow .plc{font-size:var(--fs-2xs);color:var(--fg2);font-variant-numeric:tabular-nums}
+.plsec{font-size:var(--fs-2xs);letter-spacing:.1em;text-transform:uppercase;color:var(--fg2);margin:12px 4px 4px}
+.plauto{font-size:var(--fs-2xs);padding:2px 4px;border-radius:99px;background:rgba(255,122,26,.13);border:1px solid rgba(255,122,26,.45);color:var(--accent3)}
+.plitems{display:grid;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));gap:12px}
+.plitems>*{max-width:420px}
+.plitem{position:relative;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);
+ border-radius:14px;overflow:hidden;transition:border-color .15s,transform .15s}
+.plitem:hover{border-color:var(--border2);transform:translateY(-2px)}
+.plitem .plth{width:100%;aspect-ratio:16/9;background:rgba(var(--well-rgb),.92);object-fit:cover;cursor:pointer;display:block}
+.plrank{position:absolute;top:8px;left:8px;font-family:var(--font-mono);font-size:var(--fs-2xs);font-weight:700;padding:2px 8px;
+ border-radius:99px;background:rgba(var(--well-rgb),.8);border:1px solid var(--border);color:var(--fg);letter-spacing:.02em}
+.plitem .plinfo{padding:8px 12px 2px;min-width:0}
+.plitem .plinfo b{display:block;font-size:var(--fs-xs);font-family:var(--font-mono);font-weight:500;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plitem .plinfo span{display:block;font-size:var(--fs-2xs);color:var(--fg2);margin-top:2px}
+.plitem .plact{display:flex;gap:4px;padding:8px 8px 8px;margin-top:auto}
+.plitem .plact button{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:rgba(var(--ink-rgb),.03);
+ color:var(--fg);cursor:pointer;font-size:var(--fs-sm)}
+.plitem .plact button:hover{border-color:var(--accent2)}
+.plmissing{opacity:.4;filter:grayscale(.8)}
+/* doc + tutor */
+.sk{position:relative;overflow:hidden;background:rgba(var(--ink-rgb),.05);border-radius:10px}
+.sk::after{content:'';position:absolute;inset:0;transform:translateX(-100%);
+ background:linear-gradient(90deg,transparent,rgba(var(--ink-rgb),.08),transparent);animation:skm 1.4s infinite}
+@keyframes skm{to{transform:translateX(100%)}}
+
+/* ═══ V2.1 "Sunset Console" — side rail (>=981px), mono voice, bento KPIs.
+   References: 200-300px rail with icon+label, depth from a subtle gradient
+   (dark-mode best practice); 2026 retro-futurism -> mono console, no pixel font. ═══ */
+.brand{font-family:var(--font-mono)}
+@media (min-width:981px){
+ body{flex-direction:row}
+ .top{position:relative;flex-direction:column;align-items:stretch;width:238px;flex:0 0 238px;max-height:100vh;overflow-y:auto;overflow-x:hidden;
+  padding:16px 12px 12px;gap:8px;border-bottom:0;border-right:1px solid var(--border);
+  background:linear-gradient(180deg,var(--shell),var(--shell));backdrop-filter:none;-webkit-backdrop-filter:none}
+ .brand{padding:2px 4px 8px;font-size:var(--fs-md);gap:8px}
+ .brand .orb{width:26px;height:26px}
+ .tabs{flex-direction:column;align-items:stretch;gap:2px;overflow:visible}
+ .tab{justify-content:flex-start;gap:12px;width:100%;padding:8px 12px;border-radius:11px;font-size:var(--fs-md);font-family:var(--font-mono);letter-spacing:.02em}
+ .tab:hover{transform:none}
+ .tab svg{width:16px;height:16px}
+ .hl{border-top:1px solid var(--border);padding-top:12px;row-gap:8px;column-gap:8px}
+ #ep{max-width:none!important;width:100%}
+ #modelPick{width:100%;max-width:none}
+ iframe,.view{min-width:0}
+ .view,#dash,#ltx,#imggen{padding:24px 28px}
+ .t10tab{left:238px}
+ .kpis{grid-template-columns:repeat(4,1fr)}
+ .kpi:first-child{grid-column:span 2}
+ .kpi:first-child b{font-size:var(--fs-4xl)}
+}
+/* V2.2 — steppers hidden (not useful: /32) + system accessibility preferences */
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+@media (prefers-contrast:more){:root{--border:rgba(var(--ink-rgb),.28);--line2:rgba(var(--ink-rgb),.4);--fg2:#cfc9e8;--fg3:#b3abd6}}
+@media (prefers-reduced-transparency:reduce){.top,.gtools,.ovl,.toast{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}}
+/* V2.3 — collapsible rail · multi-select gallery · i2v drop */
+.railtoggle{display:none}
+.iconbtn.on{color:var(--tint-violet);border-color:rgba(196,77,255,.5);background:rgba(196,77,255,.13)}
+.gcard.gsel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.selmode .gcard{cursor:copy}
+#ltx.dropping{outline:2px dashed var(--accent2);outline-offset:-8px}
+@media (min-width:981px){
+ .railtoggle{display:block;align-self:flex-end;padding:2px 8px;font-size:var(--fs-sm);line-height:1.2}
+ .rail-mini .top{width:64px;flex:0 0 64px;padding:12px 8px}
+ .rail-mini .railtoggle{align-self:center}
+ .rail-mini .brand{justify-content:center;padding:2px 0 4px}
+ .rail-mini .brand,.rail-mini .tab{font-size:0;letter-spacing:0;gap:0}
+ .rail-mini .tab{justify-content:center;padding:8px}
+ .rail-mini .tab svg{width:18px;height:18px}
+ .rail-mini .hl{display:none}
+ .rail-mini .t10tab{left:64px}
+}
+/* ⟁ Balance panel (dashboard) */
+#balPanel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;margin:0 0 16px}
+#balPanel:empty{display:none}
+.tbhead{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.tbhead>span:first-child{font-weight:700;font-size:var(--fs-md);letter-spacing:.03em}
+.tbpct{font-size:var(--fs-2xl);font-weight:800;font-variant-numeric:tabular-nums;color:var(--fg)}
+.tbsub{font-size:var(--fs-2xs);color:var(--fg2);font-family:var(--font-mono)}
+.tbrow{display:flex;align-items:center;gap:8px;margin:4px 0}
+.tbn{width:160px;font-size:var(--fs-xs);font-family:var(--font-mono);color:var(--fg2);flex:none;white-space:nowrap}
+.tbg{flex:1;height:7px;border-radius:5px;background:rgba(var(--ink-rgb),.08);overflow:hidden}
+.tbg>i{display:block;height:100%;border-radius:5px}
+.tbv{width:26px;text-align:right;font-size:var(--fs-xs);font-variant-numeric:tabular-nums;color:var(--fg2)}
+.tbverdict{margin-top:8px;font-size:var(--fs-xs);color:var(--fg2)}
+/* ⟁ Highlight (high score) + emergency stop */
+.gbadge.highlight{border-color:#ffd166;color:#ffd166;box-shadow:0 0 14px rgba(255,209,102,.45);animation:hlpulse 1.8s ease-in-out infinite}
+@keyframes hlpulse{50%{box-shadow:0 0 24px rgba(255,209,102,.8)}}
+.hlreg{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,209,102,.25);font-size:var(--fs-xs);color:var(--fg2);display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.hlchip{font-family:var(--font-mono);font-size:var(--fs-xs);padding:2px 8px;border-radius:99px;border:1px solid var(--hl-line);color:var(--warn-ink);background:var(--hl-bg);cursor:pointer}
+.hlchip:hover{background:var(--hl-bg-hover)}
+.emergency{color:var(--c-break);border-color:rgba(255,51,85,.45);font-size:var(--fs-md)}
+.emergency:hover{background:rgba(255,51,85,.12);border-color:var(--c-break);color:var(--c-break)}
+.emergency.busy{animation:micpulse 1.1s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}}
+
+/* A checkbox is not a text field. The `width:100%` rules above target inputs
+   you type into; applied to a checkbox they stretch it across the column and
+   squeeze its own label into a sliver. Declared last so source order wins. */
+input[type=checkbox],input[type=radio]{width:auto!important;flex:none;accent-color:var(--accent)}
+
+/* Dashboard cards state facts, so they are typeset as data: monospace,
+   dimmed, and a budget bar whose colour is the same green/amber/red the
+   generator uses for the 16 GB guardrail. */
+.cfacts{font-family:var(--font-mono);font-size:var(--fs-2xs);letter-spacing:.02em;color:var(--fg2);margin:2px 0 4px}
+.cfacts.dim{opacity:.7;margin:4px 0 0}
+.budget{display:flex;align-items:center;gap:8px;margin:0 0 2px}
+.budget .bbar{flex:1;height:5px;border-radius:4px;background:rgba(var(--ink-rgb),.08);overflow:hidden}
+.budget .bbar>i{display:block;height:100%;border-radius:4px}
+.budget .bval{font-family:var(--font-mono);font-size:var(--fs-2xs);color:var(--fg2);white-space:nowrap}
+
+/* ── Light theme ───────────────────────────────────────────────────────────
+   Only the palette flips. Every rule above already paints with these tokens,
+   so not one layout or component rule is duplicated here. Accents are
+   darkened: the same hue that reads on near-black is illegible on near-white. */
+:root[data-theme="light"]{
+  --tint-violet:#6d28b8; --tint-steel:#3a4a78;
+  --ink-rgb: 26,16,48;
+  --body-ink:#2a2044; --ex-ink:#0c4436; --ex-bad-ink:#8a1027; --out-ink:#0a3a44;
+  --ok-ink:#0a7f57; --warn-ink:#a35a00; --bad-ink:#c41d33; --alert-ink:#b3253a;
+  --on-media:#f4f1ff; --on-media-dim:rgba(244,241,255,.72);  /* unchanged: the ground below it is still dark */
+  --toast-ok:#e4f6ee; --toast-err:#fce9ec; --toast-warn:#fdf1e2;
+  --hl-line:rgba(163,90,0,.45); --hl-bg:rgba(163,90,0,.09); --hl-bg-hover:rgba(163,90,0,.17);
+  --chip-bg:rgba(10,127,87,.10); --chip-bg-hover:rgba(10,127,87,.18);
+  --sunk:#f1ecfa;
+  --shell:rgba(255,255,255,.9); --field:#ffffff; --disabled:#e6dff5; --bg:#f7f4fd; --bg1:#ffffff;
+  --fg:#1a1030; --fg2:#544a6e; --fg3:#7b7196;
+  --panel:#ffffff; --surface:#ffffff; --surface2:#f5f1fd;
+  --border:rgba(26,16,48,.14); --line:rgba(26,16,48,.12); --line2:rgba(26,16,48,.2);
+  --c-create:#8b2fd6; --c-limit:#0a8f63; --c-render:#c25700; --c-break:#d61f3d;
+  --c-void:#f7f4fd; --violet:#6d4bd8; --green:#0a8f63; --amber:#b06a00;
+  --accent-ink:#ffffff; --mut:#7b7196;
+  --shadow-1:0 8px 22px -14px rgba(26,16,48,.35);
+  --shadow-2:0 16px 40px -22px rgba(26,16,48,.4);
+  --shadow-card:0 12px 30px -20px rgba(26,16,48,.3);
+  --glow-a:none; --glow-c:none;
+  color-scheme:light;
+}
+
+/* The Top-10 handle is a dashboard affordance; on the guide it is a fixed tab
+   floating over the article. The rule moved out with the guide's CSS, and the
+   guide is an iframe now, so it keys off that. */
+body:has(#f-doc.active) .t10tab{display:none!important}
+
+/* WCAG 2.2 AA (2.5.8) pointer targets: 24x24 CSS px floor. Declared last so a
+   dense component cannot shrink a control below it. Measured offenders before
+   this: rail toggle 24x22, volume slider 54x16, close buttons 23x20,
+   Top-10 links 172x14, "clear history" 149x20. */
+:root{--target-min:24px}
+button,select,summary,[role=button],textarea,
+input:not([type=checkbox]):not([type=radio]){min-height:var(--target-min)}
+button,select,summary,[role=button]{min-width:var(--target-min)}
+label:has(input[type=checkbox]),label:has(input[type=radio]){min-height:var(--target-min)}
+.t10 .t10n{min-height:var(--target-min);display:flex;align-items:center}
+
+/* WCAG 2.4.7. Declared last on purpose: this rule already existed near the top
+   of the sheet, and six later `outline:none` rules at equal specificity beat
+   it, so keyboard focus computed outline-style:none on every control. */
+:focus-visible{outline:2px solid var(--accent2);outline-offset:2px;border-radius:4px}
+
+/* One icon vocabulary: 24x24 stroke geometry, currentColor, 1.8 weight — the
+   same drawing the nav tabs already used. Emoji were baked by the platform
+   font: they ignored the theme, shifted metrics between machines and could
+   not take a stroke weight. Reaction pickers and the favicon stay emoji. */
+.ico{width:1.05em;height:1.05em;flex:none;vertical-align:-.16em;fill:none;
+ stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ico-lg{width:1.25em;height:1.25em}
+button>.ico:first-child:not(:only-child),summary>.ico:first-child{margin-right:.42em}
+
+/* Interaction states, declared once for every control. Pressed and disabled
+   were missing on most classes: a control that looks pressable and neither
+   acknowledges the press nor shows it is unavailable reads as broken.
+   Elevation and opacity only — nothing here changes layout bounds. */
+button:not(:disabled):not([aria-busy="true"]):active,
+.chip:not(:disabled):active,.plrow:active,.tab:active{transform:translateY(1px);filter:brightness(.94)}
+button:disabled,button[disabled],[aria-disabled="true"]{opacity:.45;cursor:not-allowed;filter:saturate(.35)}
+button:disabled:hover,button[disabled]:hover{border-color:var(--border);transform:none;filter:saturate(.35)}
+[aria-busy="true"]{cursor:progress;position:relative;color:transparent!important}
+[aria-busy="true"]>*{visibility:hidden}
+[aria-busy="true"]::after{content:'';position:absolute;inset:0;margin:auto;width:14px;height:14px;
+ border:2px solid rgba(var(--ink-rgb),.28);border-top-color:var(--accent2);border-radius:50%;
+ animation:btnspin .7s linear infinite}
+@keyframes btnspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){
+ button:active,.chip:active,.plrow:active,.tab:active{transform:none}
+ [aria-busy="true"]::after{animation:none;border-top-color:var(--accent2);opacity:.7}
+}
+</style></head><body><svg class="ico-sprite" aria-hidden="true" width="0" height="0" style="position:absolute"><symbol id="i-antenna" viewBox="0 0 24 24"><path d="M12 13.5V21M8 21h8"/><path d="M8.4 10.6a5 5 0 0 1 7.2 0M5.6 7.6a9 9 0 0 1 12.8 0"/><circle cx="12" cy="13" r="1.4"/></symbol><symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h15"/><path d="M13 6l6 6-6 6"/></symbol><symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol><symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2.5L5 13.5h6l-.7 8L19 10.5h-6z"/></symbol><symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19v15.5H5.5A1.5 1.5 0 0 0 4 20z"/><path d="M4 19.5A1.5 1.5 0 0 1 5.5 18H19v3H5.5A1.5 1.5 0 0 1 4 19.5z"/><path d="M8 7.5h7M8 11h7"/></symbol><symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8.5a2 2 0 0 1 2-2h2.6l1.4-2.4h6l1.4 2.4H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="12.8" r="3.6"/></symbol><symbol id="i-cap" viewBox="0 0 24 24"><path d="M2.5 8.5L12 4.5l9.5 4-9.5 4z"/><path d="M6.5 10.3V16c0 1.6 2.5 3 5.5 3s5.5-1.4 5.5-3v-5.7M21.5 8.5V14"/></symbol><symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-6M21 20H3" /></symbol><symbol id="i-clapper" viewBox="0 0 24 24"><path d="M3 8h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 8l1.4-3.6 16.2 2L21 8"/><path d="M8.2 4.8L10 8M13.2 5.4L15 8.4"/></symbol><symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18.5h10.2a4 4 0 0 0 .6-8A6 6 0 0 0 6.4 11 3.8 3.8 0 0 0 7 18.5z"/></symbol><symbol id="i-coins" viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/><path d="M5 11.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></symbol><symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2"/></symbol><symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 9.5h.01M9.5 9.5h.01M13 9.5h.01M16.5 9.5h.01M6 12.5h.01M9.5 12.5h.01M13 12.5h.01M16.5 12.5h.01M8 15.5h8"/></symbol><symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 2.5l8.5 4.7v9.6L12 21.5 3.5 16.8V7.2z"/><path d="M3.5 7.2L12 12l8.5-4.8M12 12v9.5"/></symbol><symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.6-6.5 9.5-6.5S21.5 12 21.5 12 17.9 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol><symbol id="i-film" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M7 5v14M17 5v14M2.5 12h19M2.5 8.5h4.5M2.5 15.5h4.5M17 8.5h4.5M17 15.5h4.5"/></symbol><symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2.5c.5 3.5-2 4.6-2 7.4 0 1.3.8 2.4 2 2.4s2-1.1 2-2.4c2 1.6 3.2 3.7 3.2 6 0 3.2-2.3 5.6-5.2 5.6S6.8 19.1 6.8 15.9c0-5 3.6-7 5.2-13.4z"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol><symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9S14.4 18.5 12 21c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3z"/></symbol><symbol id="i-headphones" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="13.5" width="4.5" height="7" rx="1.8"/><rect x="17" y="13.5" width="4.5" height="7" rx="1.8"/></symbol><symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.5L12 3.5l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M3.5 17l4.8-4.4 3.5 3 3.3-2.6L20.5 17"/></symbol><symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M3 12.5l9 4.5 9-4.5M3 17l9 4.5 9-4.5"/></symbol><symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13.8a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7l-1.5 1.5"/><path d="M14 10.2a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 1 0 5.7 5.7l1.5-1.5"/></symbol><symbol id="i-masks" viewBox="0 0 24 24"><path d="M10.5 4.5c-3.4 0-5.5 1.2-5.5 1.2s-.4 5.3 1.3 8.2c1.2 2 4.2 2 5.4 0 1.7-2.9 1.3-8.2 1.3-8.2s-2.1-1.2-2.5-1.2z"/><path d="M15 6.4c2.5.3 4 1.3 4 1.3s.4 5.3-1.3 8.2c-1 1.6-3 1.9-4.4.9"/></symbol><symbol id="i-medal" viewBox="0 0 24 24"><circle cx="12" cy="14.5" r="6"/><path d="M8.6 9L6 2.5h4.5L12 6M15.4 9L18 2.5h-4.5L12 6"/><path d="M12 12v5M10.5 13.5h1.5"/></symbol><symbol id="i-mic" viewBox="0 0 24 24"><rect x="9.9" y="3.2" width="4.2" height="9.2" rx="2.1"/><path d="M6.8 11.2a5.2 5.2 0 0 0 10.4 0M12 16.6v3.6M9.2 20.2h5.6"/></symbol><symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol><symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-.9 2-1.8 0-1.4-1-1.9-1-3 0-.9.7-1.6 1.7-1.6H17a4.5 4.5 0 0 0 4-4.6C21 6.2 17 3 12 3z"/><circle cx="8" cy="9" r="1.2"/><circle cx="12" cy="7" r="1.2"/><circle cx="16" cy="9.6" r="1.2"/></symbol><symbol id="i-pencil" viewBox="0 0 24 24"><path d="M16.5 3.6l3.9 3.9L8.3 19.6l-4.8.9.9-4.8z"/><path d="M14.4 5.7l3.9 3.9"/></symbol><symbol id="i-pin" viewBox="0 0 24 24"><path d="M9.5 3h5l-.8 5.5 3.3 3.2H7l3.3-3.2z"/><path d="M12 11.7V21"/></symbol><symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v6M15 3v6"/><path d="M6 9h12v2.5a6 6 0 0 1-12 0z"/><path d="M12 17.5V21"/></symbol><symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol><symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20.5 11a8.5 8.5 0 0 0-15-4.6M3.5 13a8.5 8.5 0 0 0 15 4.6"/><path d="M20.5 5v6h-6M3.5 19v-6h6"/></symbol><symbol id="i-rocket" viewBox="0 0 24 24"><path d="M12 2.5c3.4 2.4 5.2 6 5.2 10L12 17l-5.2-4.5c0-4 1.8-7.6 5.2-10z"/><circle cx="12" cy="9.5" r="2"/><path d="M8.4 16.4c-1.6.8-2.3 2.6-2.2 5.1 2.5.1 4.3-.7 5.1-2.3M15.6 16.4c1.6.8 2.3 2.6 2.2 5.1-2.5.1-4.3-.7-5.1-2.3"/></symbol><symbol id="i-ruler" viewBox="0 0 24 24"><rect x="2.2" y="8" width="19.6" height="8" rx="1.6" transform="rotate(-45 12 12)"/><path d="M9.4 7.2l1.7 1.7M12.2 10l1.7 1.7M15 12.8l1.7 1.7"/></symbol><symbol id="i-save" viewBox="0 0 24 24"><path d="M4 5.5a2 2 0 0 1 2-2h10l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 3.5v5h6v-5M8 20.5v-6h8v6"/></symbol><symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 4v16M7 20h10M12 6l-6 2M12 6l6 2"/><path d="M2.5 13.5L6 8l3.5 5.5a3.5 3.5 0 0 1-7 0zM14.5 15.5L18 10l3.5 5.5a3.5 3.5 0 0 1-7 0z"/></symbol><symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.3 15.3L21 21"/></symbol><symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.4-3 8-7.5 9.5C7.5 20 4.5 16.4 4.5 12V6z"/><path d="M9 12.2l2.2 2.2 4-4.4"/></symbol><symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M17 4l4 3.5-4 3.5M17 13l4 3.5-4 3.5"/><path d="M3 7.5h4.2c3 0 3.6 9 6.6 9H21M3 16.5h4.2c1.4 0 2.3-2 3-4M21 7.5h-4c-1.2 0-2 1.4-2.7 3"/></symbol><symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 21v-7M5 10.5V3M12 21v-11M12 6.5V3M19 21v-4M19 13.5V3"/><path d="M2.5 14h5M9.5 10h5M16.5 17h5"/></symbol><symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></symbol><symbol id="i-stars" viewBox="0 0 24 24"><path d="M7 3l1.4 3.6L12 8l-3.6 1.4L7 13l-1.4-3.6L2 8l3.6-1.4z"/><path d="M16.5 11l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z"/></symbol><symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9"/></symbol><symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></symbol><symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 6.5h16M9.5 6.5V4.2A1.2 1.2 0 0 1 10.7 3h2.6a1.2 1.2 0 0 1 1.2 1.2v2.3"/><path d="M6 6.5l.9 13a1.6 1.6 0 0 0 1.6 1.5h7a1.6 1.6 0 0 0 1.6-1.5l.9-13"/><path d="M10.5 10.5v6.5M13.5 10.5v6.5"/></symbol><symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol><symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></symbol><symbol id="i-wand" viewBox="0 0 24 24"><path d="M4 20L16.5 7.5"/><path d="M18 3l.9 2.1 2.1.9-2.1.9L18 9l-.9-2.1L15 6l2.1-.9z"/><path d="M6.5 4l.6 1.4 1.4.6-1.4.6L6.5 8l-.6-1.4L4.5 6l1.4-.6z"/></symbol><symbol id="i-check-square" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M8 12.2l2.8 2.8L16.5 9"/></symbol><symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7.5 10.5L12 15l4.5-4.5"/><path d="M4 17.5v1.5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.5"/></symbol><symbol id="i-flip-h" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M9 6.5L3.5 12 9 17.5z"/><path d="M15 6.5L20.5 12 15 17.5z"/></symbol><symbol id="i-flip-v" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M6.5 9L12 3.5 17.5 9z"/><path d="M6.5 15L12 20.5 17.5 15z"/></symbol><symbol id="i-rotate" viewBox="0 0 24 24"><path d="M4 10a8.5 8.5 0 1 1 1.6 6.6"/><path d="M3.5 4.5v6h6"/></symbol></svg>
+<div class="top">
+  <span class="brand"><span class="orb" aria-hidden="true"></span>Dynamic Video Generator</span>
+  <button id="railToggle" class="iconbtn railtoggle" title="Collapse the rail">⟨</button>
+  <nav class="tabs">
+    <button class="tab active" data-v="generator"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/><path d="M19 3.5v4M17 5.5h4" stroke-linecap="round"/></svg>Generator</button>
+    <button class="tab" data-v="storyboard"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 5v14M16 5v14M3 10h5M3 15h5M16 10h5M16 15h5"/></svg>Storyboard</button>
+    <button class="tab" data-v="gallery"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M3 17l5.5-5 4 3.5L17 11l4 4.5"/></svg>Gallery</button>
+    <button class="tab" data-v="images"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 1 9-9c0 2.5-1.6 3.5-3.4 3.5h-2.1c-1.4 0-2.1 1.2-1.4 2.4.6 1.1.2 3.1-2.1 3.1z"/><circle cx="8" cy="10" r="1.2"/><circle cx="12" cy="7.5" r="1.2"/><circle cx="16" cy="10" r="1.2"/></svg>Images</button>
+    <button class="tab" data-v="ltx"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="10" width="18" height="9" rx="2"/><path d="M3.5 10L20 6.2l-.8-2.9L3 7.1zM7.5 9l3-3.6M12.5 7.8l3-3.6"/></svg>Sequence</button>
+    <button class="tab" data-v="dash"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3" stroke-linecap="round"/></svg>Dashboard</button>
+    <button class="tab" data-v="plists" title="Manual and automatic playlists (scores, characters)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13a8 8 0 0 1 16 0"/><rect x="3" y="13" width="4" height="7" rx="1.5"/><rect x="17" y="13" width="4" height="7" rx="1.5"/></svg>Playlists</button>
+    <button class="tab" data-v="doc" title="LTX English — reference and prompting tutor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M9 7.5h7M9 11h7"/></svg>Doc</button>
+  </nav>
+  <span class="spacer"></span>
+  <span class="hl">
+    <span><i class="dot" id="dPh"></i>Phosphene</span><span><i class="dot" id="dOl"></i>Ollama</span><span id="ramBadge" style="font-size:var(--fs-2xs);opacity:.75;cursor:pointer" title="Render-host RAM — click for the monitor"></span><span id="pxVer" style="font-size:var(--fs-2xs);opacity:.75" title="CORS proxy version on the render host"></span>
+    <span title="Video volume" style="display:inline-flex;align-items:center;gap:2px;font-size:var(--fs-2xs)"><svg class="ico" aria-hidden="true"><use href="#i-volume"/></svg><input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.35" style="width:54px;vertical-align:middle"></span>
+    <button id="emergencyBtn" class="iconbtn emergency" title="Emergency stop: stop the render + clear the queue + sleep the LLM">⟁</button>
+    <button id="micLangTop" class="iconbtn" title="Voice dictation language (click to switch)"><svg class="ico" aria-hidden="true"><use href="#i-mic"/></svg> FR</button>
+    <button id="helpBtn" class="iconbtn" title="Keyboard shortcuts (?)"><svg class="ico" aria-hidden="true"><use href="#i-keyboard"/></svg></button>
+    <button id="themeBtn" class="iconbtn" title="Switch between the light and dark theme"><svg class="ico" aria-hidden="true"><use href="#i-moon"/></svg></button>
+    <input id="ep" class="modelpick" style="max-width:200px" placeholder="backend URL" title="Endpoint (auto: localhost, or Cloudflare through Firebase)"><select class="modelpick" id="modelPick" title="LLM model"></select>
+  </span>
+</div>
+<div id="dash" class="view">
+  <div class="dhead"><strong><svg class="ico" aria-hidden="true"><use href="#i-chart"/></svg> Render metrics</strong><span style="opacity:.6;font-size:var(--fs-2xs)" id="dSubtitle">measured from each file and its sidecar — duration, budget, seconds per step</span><span class="spacer"></span><label style="display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-2xs);opacity:.8;cursor:pointer"><input type="checkbox" id="dAuto" style="accent-color:var(--accent2)">auto 30 s</label><button class="btn" id="dRefresh"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg> Refresh</button></div>
+  <div class="kpis" id="dKpis"></div>
+  <div id="dTimeline"></div>
+  <div class="dtools">
+    <input type="search" id="dSearch" placeholder="Filter by name or prompt…">
+    <div class="seg" id="dSort">
+      <button data-s="date" class="on">Recent</button>
+      <button data-s="duration">Duration</button>
+      <button data-s="size">Size</button>
+      <button data-s="budget">Budget</button>
+      <button data-s="render">Render time</button>
+    </div>
+  </div>
+  <div class="grid" id="dGrid"></div>
+  <div class="empty" id="dEmpty" style="display:none">No video. Generate a clip then refresh.</div>
+
+</div>
+<!-- ═══ Native gallery (replaces the gallery.html iframe) ═══ -->
+<div id="gal" class="view">
+  <div class="gtools">
+    <div class="micwrap" style="flex:1 1 220px;max-width:340px"><input type="search" id="gSearch" placeholder="Name, prompt, character…" style="width:100%"></div>
+    <div class="seg" id="gFilter">
+      <button data-f="all" class="on">All</button>
+      <button data-f="video"><svg class="ico" aria-hidden="true"><use href="#i-film"/></svg> Videos</button>
+      <button data-f="image"><svg class="ico" aria-hidden="true"><use href="#i-image"/></svg> Images</button>
+      <button data-f="week">7 days</button>
+    </div>
+    <div class="seg" id="gSort">
+      <button data-s="date" class="on">Recent</button>
+      <button data-s="budget">Budget</button>
+      <button data-s="name">Name</button>
+      <button data-s="size">Size</button>
+    </div>
+    <span class="spacer"></span>
+    <button class="btn" id="gSelAdd" style="display:none"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg> Playlist (0)</button>
+    <button class="iconbtn" id="gSelMode" title="Multi-select -> add several videos to a playlist"><svg class="ico" aria-hidden="true"><use href="#i-check-square"/></svg></button>
+    <span id="gCount" style="font-size:var(--fs-2xs);opacity:.6;font-family:var(--font-mono)">—</span>
+    <button class="load" id="gReload" style="width:auto;padding:8px 12px" title="Reload the outputs"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+  </div>
+  <div class="ggrid" id="gGrid"></div>
+  <div class="empty" id="gEmpty" style="display:none">All quiet — no outputs yet. Try a rewrite: LTX or Images.</div>
+</div>
+<!-- ═══ Playlists ═══ -->
+<div id="plists" class="view">
+  <div class="plwrap">
+    <div class="plside card" style="padding:12px">
+      <div class="dhead" style="margin-bottom:8px"><strong><svg class="ico" aria-hidden="true"><use href="#i-headphones"/></svg> Playlists</strong><span class="spacer"></span><button class="load" id="plNew" style="width:auto;padding:4px 8px" title="Create a playlist">＋</button></div>
+      <div class="plsec">Auto — measured metrics</div>
+      <div id="plAutoList"></div>
+      <div class="plsec">Auto — characters</div>
+      <div id="plCharList"></div>
+      <div class="plsec">My playlists</div>
+      <div id="plUserList"></div>
+      <div id="plUserEmpty" style="font-size:var(--fs-2xs);opacity:.5;padding:4px 4px">None — click ＋ or add from the gallery.</div>
+    </div>
+    <div class="plmain">
+      <div class="dhead" id="plHead" style="margin-bottom:12px"><strong id="plTitle">Choose a playlist</strong><span id="plMeta" style="opacity:.6;font-size:var(--fs-2xs)"></span><span class="spacer"></span>
+        <button class="btn" id="plPlay" style="display:none">▶ Play all</button>
+        <button class="load" id="plShuffle" style="display:none;width:auto;padding:8px 12px" title="Shuffle"><svg class="ico" aria-hidden="true"><use href="#i-shuffle"/></svg></button>
+        <button class="load" id="plFreeze" style="display:none;width:auto;padding:8px 12px" title="Copy this auto playlist into My playlists"><svg class="ico" aria-hidden="true"><use href="#i-pin"/></svg> Pin</button>
+        <button class="load" id="plRename" style="display:none;width:auto;padding:8px 12px" title="Rename"><svg class="ico" aria-hidden="true"><use href="#i-pencil"/></svg></button>
+        <button class="load" id="plDelete" style="display:none;width:auto;padding:8px 12px;border-color:rgba(255,80,80,.5);color:var(--alert-ink)" title="Delete the playlist"><svg class="ico" aria-hidden="true"><use href="#i-trash"/></svg></button>
+      </div>
+      <div class="plitems" id="plItems"></div>
+      <div class="empty" id="plEmpty">← Pick an auto playlist or create your own.</div>
+    </div>
+  </div>
+</div>
+<!-- ═══ Doc — LTX English + prompting tutor ═══ -->
+<iframe id="f-doc" allow="fullscreen" allowfullscreen></iframe>
+<!-- ═══ Lightbox player (gallery + playlists) ═══ -->
+<div id="lbOvl" class="ovl">
+  <div class="ovl-card lb-card" style="position:relative">
+    <button class="lbnav prev" id="lbPrev" title="previous (←)">‹</button>
+    <button class="lbnav next" id="lbNext" title="next (→)">›</button>
+    <h3 style="display:flex;align-items:center;gap:8px"><span id="lbTitle" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);font-size:var(--fs-sm)">—</span><span id="lbQueue" style="font-size:var(--fs-2xs);opacity:.6;font-variant-numeric:tabular-nums"></span><button id="lbClose" style="background:none;border:0;color:rgba(var(--ink-rgb),.6);cursor:pointer;font-size:var(--fs-xl)" title="close (Esc)">✕</button></h3>
+    <div id="lbMedia"><div class="empty">loading…</div></div>
+    <div class="lbprompt" id="lbPrompt" style="display:none"></div>
+    <div class="lbrow" id="lbActions"></div>
+  </div>
+</div>
+<!-- ═══ Frame Studio: extract a frame (the last one by default) ═══ -->
+<div id="fsOvl" class="ovl">
+  <div class="ovl-card lb-card">
+    <h3 style="display:flex;align-items:center;gap:8px"><svg class="ico" aria-hidden="true"><use href="#i-image"/></svg> Frame Studio <span id="fsName" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);font-size:var(--fs-xs);opacity:.7">—</span><button id="fsClose" style="background:none;border:0;color:rgba(var(--ink-rgb),.6);cursor:pointer;font-size:var(--fs-xl)" title="close (Esc)">✕</button></h3>
+    <video id="fsVideo" muted playsinline style="width:100%;max-height:46vh;border-radius:12px;background:#000"></video>
+    <input type="range" id="fsRange" class="fsrange" min="0" max="100" step="0.01" value="100">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="fstime" id="fsTime">—</span><span class="spacer"></span>
+      <button class="load" id="fsFirst" style="width:auto;padding:4px 12px">⏮ First</button>
+      <button class="load" id="fsPrev" style="width:auto;padding:4px 12px" title="-1 frame (≈1/24 s)">−1f</button>
+      <button class="load" id="fsNext" style="width:auto;padding:4px 12px" title="+1 frame">+1f</button>
+      <button class="load" id="fsLast" style="width:auto;padding:4px 12px">⏭ Last</button>
+      <button class="btn" id="fsGrab"><svg class="ico" aria-hidden="true"><use href="#i-camera"/></svg> Capture this frame</button>
+    </div>
+    <div class="fscap" id="fsCap" style="display:none">
+      <canvas id="fsCanvas"></canvas>
+      <div style="flex:1;min-width:220px">
+        <div style="font-size:var(--fs-2xs);opacity:.7;margin-bottom:8px" id="fsCapInfo">—</div>
+        <div class="lbrow" style="margin-top:0">
+          <button class="load" id="fsDl" style="width:auto"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg> PNG</button>
+          <button class="load" id="fsSave" style="width:auto" title="Save into the render host's images (/img-save)"><svg class="ico" aria-hidden="true"><use href="#i-save"/></svg> M4</button>
+          <button class="load" id="fsToI2V" style="width:auto" title="Send as the Generator's i2v start image"><svg class="ico" aria-hidden="true"><use href="#i-bolt"/></svg> → i2v</button>
+          <button class="load" id="fsToKf" style="width:auto" title="Use as the start frame of LTX frame-to-frame mode"><svg class="ico" aria-hidden="true"><use href="#i-film"/></svg> → keyframe LTX</button>
+          <button class="load" id="fsToImg" style="width:auto" title="Use as the img2img start image (Images tab)"><svg class="ico" aria-hidden="true"><use href="#i-palette"/></svg> → img2img</button>
+        </div>
+        <div style="font-size:var(--fs-2xs);opacity:.5;margin-top:8px">Tip: capture the <b>last frame</b> then "→ i2v" or "→ keyframe" to chain a new clip that picks up exactly where the previous one stopped.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ═══ Add to a playlist ═══ -->
+<div id="ppOvl" class="ovl">
+  <div class="ovl-card" style="max-width:380px">
+    <h3><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg> Add to a playlist</h3>
+    <div id="ppName" style="font-size:var(--fs-2xs);font-family:var(--font-mono);opacity:.65;margin-bottom:8px;word-break:break-all">—</div>
+    <div id="ppList" style="display:flex;flex-direction:column;gap:4px;max-height:240px;overflow:auto"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <input id="ppNew" placeholder="new playlist…" style="flex:1;background:rgba(0,0,0,.35);border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:8px 8px;font-size:var(--fs-sm)">
+      <button class="btn" id="ppCreate">Create</button>
+    </div>
+    <button id="ppClose" class="tab" data-help="1" style="margin-top:12px;padding:4px 12px">Close</button>
+  </div>
+</div>
+<div class="toasts" id="toasts"></div>
+<div id="trinFx"></div>
+<iframe id="f-generator" class="active" allow="fullscreen" allowfullscreen></iframe>
+<iframe id="f-storyboard" allow="fullscreen" allowfullscreen></iframe>
+<div id="imggen" class="view">
+  <div class="ig-left">
+    <div class="dhead" style="margin-bottom:8px"><strong>Draw Things — image</strong><span class="spacer"></span><span style="font-size:var(--fs-2xs)"><i class="dot" id="dDt"></i>Draw Things</span></div>
+    <div class="card">
+      <label for="igModel">Model <span style="opacity:.5;text-transform:none">(installed in Draw Things)</span></label>
+      <select id="igModel" style="font-family:inherit;background:var(--sunk);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:4px;width:100%;font-size:var(--fs-xs);margin-bottom:8px"></select>
+      <label for="igPrompt">Prompt</label>
+      <textarea id="igPrompt" placeholder="ex: a lone lighthouse keeper, white halo, cinematic lighting"></textarea>
+      <div class="chips" id="igChips"></div>
+      <label for="igNeg">Negative prompt <span style="opacity:.5;text-transform:none">(ignored when CFG = 1, e.g. FLUX.2-klein)</span></label>
+      <textarea id="igNeg" placeholder="blurry, lowres, watermark"></textarea>
+      <div class="irow">
+        <label>Width<input id="igW" type="number" value="1024" step="64" min="256"></label>
+        <label>Height<input id="igH" type="number" value="1024" step="64" min="256"></label>
+        <label>Steps<input id="igSteps" type="number" value="4" min="1"></label>
+        <label>CFG<input id="igCfg" type="number" value="1" step="0.5" min="0"></label>
+        <label>Seed<input id="igSeed" type="number" value="-1"></label>
+      </div>
+      <details id="i2iWrap" style="margin:4px 0 8px;border:1px solid var(--border);border-radius:8px;padding:8px 8px;">
+        <summary style="cursor:pointer;font-size:var(--fs-2xs);letter-spacing:.06em;text-transform:uppercase;opacity:.85;color:var(--accent3)"><svg class="ico" aria-hidden="true"><use href="#i-image"/></svg> Image-to-image <span style="opacity:.6;text-transform:none">(optional · starts from an image)</span></summary>
+        <label style="margin-top:8px">Start image</label>
+        <input type="file" id="igInit" accept="image/png,image/jpeg,image/jpg,image/webp" style="font-size:var(--fs-xs);width:100%">
+        <div id="igInitPrev" style="display:none;margin-top:8px"><img id="igInitImg" style="max-width:120px;border-radius:6px;border:1px solid var(--border)" alt=""><button class="load" id="igInitClear" style="width:auto;padding:2px 8px;margin-left:8px;font-size:var(--fs-2xs);vertical-align:top">✕ remove</button></div>
+        <label style="margin-top:8px">Force de transformation <span id="igDenoiseVal" style="opacity:.6;text-transform:none">0.65</span></label>
+        <input type="range" id="igDenoise" min="0.1" max="1" step="0.05" value="0.65" style="width:100%">
+        <div style="font-size:var(--fs-2xs);opacity:.55;margin-top:4px">0.3 = faithful to the image · 0.8 = creative. When an image is loaded, ✦ Generate does img2img.</div>
+      </details>
+      <div style="font-size:var(--fs-2xs);opacity:.5;margin:-2px 0 4px">FLUX.2-klein-4B: 4 steps · CFG 1 · 1024² (few-step distilled)</div>
+      <div class="igbtns"><button class="btn" id="igGo">✦ Generate</button><button class="load" id="igEnrich" title="Rewrite the prompt into a clean English image prompt (LLM)"><svg class="ico" aria-hidden="true"><use href="#i-sparkle"/></svg> Enhance</button></div>
+      <div id="igStatus" style="font-size:var(--fs-2xs);opacity:.8;margin-top:8px;min-height:14px"></div>
+      <label style="margin-top:8px">Endpoint Draw Things</label>
+      <input id="dtEp" class="modelpick" style="max-width:none;width:100%" placeholder="auto (base + /dt)" title="Draw Things proxy endpoint">
+    </div>
+  </div>
+  <div class="ig-right">
+    <div class="dhead" style="margin-bottom:8px"><strong>Result</strong><span style="opacity:.6;font-size:var(--fs-2xs)">-> uploadable into the generator's i2v</span></div>
+    <div id="igProg" class="igprog" style="display:none"><div class="igprog-bar"><i></i></div><div class="igprog-txt">—</div></div>
+    <div class="grid" id="igOut"></div>
+    <div class="empty" id="igOutEmpty">Images you generate land here, ready to send to the generator's i2v.</div>
+    <div class="dhead" style="margin:16px 0 8px"><strong>Stored images (render host)</strong><span class="spacer"></span><button class="load" id="igReload" style="width:auto;padding:4px 8px"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg> Refresh</button><button class="load" id="igScanAll" style="width:auto;padding:4px 8px;margin-left:4px" title="Full scan of every DrawThings image on the render host (Assets, Generated, Pictures, …)"><svg class="ico" aria-hidden="true"><use href="#i-folder"/></svg> All render-host images</button></div>
+    <div class="grid" id="igStored"></div>
+    <div class="empty" id="igStoredEmpty" style="display:none">No stored image — generate to fill this.</div>
+    <div class="dhead" style="margin:16px 0 8px"><strong>Every DrawThings image on the render host</strong><span class="spacer"></span><span id="igScanStat" style="opacity:.6;font-size:var(--fs-2xs)">—</span></div>
+    <div class="grid" id="igScanGrid"></div>
+    <div class="empty" id="igScanEmpty">Scan to list every DrawThings image on the render host (Assets, Generated, Pictures, …).</div>
+  </div>
+</div>
+<div id="ltx" class="view">
+  <div class="dhead"><strong><svg class="ico" aria-hidden="true"><use href="#i-film"/></svg> Sequence — chaining shots</strong><span class="spacer"></span><span style="font-size:var(--fs-2xs)"><i class="dot" id="dLtx"></i>Phosphene</span></div>
+  <div class="ltxhead">
+  <p class="ltxwhy">The Generator sends one shot from one prompt. This is where a shot
+  becomes a sequence: <b>extend</b> continues a clip you already rendered, <b>frame-to-frame</b>
+  fills the motion between two images, and <b>long</b> plans a chain of segments that each
+  stay inside the memory budget. Same backend, same contract — the difference is what you
+  can feed it.</p>
+  <div class="ltxpick">
+  <div class="ltxmodes">
+    <button type="button" class="ltxmode active" data-m="t2v" title="one shot from a prompt"><svg class="ico" aria-hidden="true"><use href="#i-sparkle"/></svg> Single shot</button>
+    <button type="button" class="ltxmode" data-m="extend" title="continue a clip you already rendered"><svg class="ico" aria-hidden="true"><use href="#i-arrow-right"/></svg> Extend a clip</button>
+    <button type="button" class="ltxmode" data-m="keyframe" title="interpolate between 2 images"><svg class="ico" aria-hidden="true"><use href="#i-film"/></svg> Frame-to-frame</button>
+    <button type="button" class="ltxmode" data-m="long" title="automatic chain of short segments — the right 16 GB method for 15-60 s"><svg class="ico" aria-hidden="true"><use href="#i-film"/></svg> Long</button>
+  </div>
+  <div class="chips" style="margin:-4px 0 12px">
+    <button type="button" class="chip" id="lxP4" title="704×416 · 97 frames · quick"><svg class="ico" aria-hidden="true"><use href="#i-bolt"/></svg> 4s draft</button>
+    <button type="button" class="chip" id="lxP5" title="704×416 · 121 frames · standard"><svg class="ico" aria-hidden="true"><use href="#i-target"/></svg> 5s standard</button>
+    <button type="button" class="chip" id="lxP20" title="Long mode preset to 20 s"><svg class="ico" aria-hidden="true"><use href="#i-film"/></svg> 20s long</button>
+  </div>
+  </div>
+  </div>
+  <div class="ltxgrid">
+    <div class="card">
+      <div id="lxModeHint" class="hint" style="font-size:var(--fs-2xs);opacity:.85;color:var(--accent3)">Text -> video. Describe the whole scene.</div>
+      <label for="lxPrompt">Prompt</label>
+      <textarea id="lxPrompt" placeholder="Cinematic close-up, golden hour, photoreal…"></textarea>
+      <div id="lxExtendBlock" style="display:none">
+        <label for="lxSrc">Source video <span style="opacity:.5;text-transform:none">(/outputs gallery)</span></label>
+        <select id="lxSrc"></select>
+        <div class="hint">⚠️ The backend extends its own last output. The source above is passed best-effort — depending on the LTX port it is used or ignored.</div>
+      </div>
+      <div id="lxKfBlock" style="display:none">
+        <label for="lxKfStart">Start frame <span style="opacity:.5;text-transform:none">· required</span></label>
+        <input type="file" id="lxKfStart" accept="image/png,image/jpeg,image/jpg,image/webp,image/bmp">
+        <div class="lxedit" id="lxEditStart" style="display:none"><button data-f="start" data-op="rot"><svg class="ico" aria-hidden="true"><use href="#i-rotate"/></svg> 90°</button><button data-f="start" data-op="fh"><svg class="ico" aria-hidden="true"><use href="#i-flip-h"/></svg> Flip H</button><button data-f="start" data-op="fv"><svg class="ico" aria-hidden="true"><use href="#i-flip-v"/></svg> Flip V</button><canvas id="lxCanvStart" style="width:120px;border-radius:6px;border:1px solid var(--border);background:#000"></canvas></div>
+        <label for="lxKfEnd">Frame de fin <span style="opacity:.5;text-transform:none">· if the backend handles 2 frames</span></label>
+        <input type="file" id="lxKfEnd" accept="image/png,image/jpeg,image/jpg,image/webp,image/bmp">
+        <div class="lxedit" id="lxEditEnd" style="display:none"><button data-f="end" data-op="rot"><svg class="ico" aria-hidden="true"><use href="#i-rotate"/></svg> 90°</button><button data-f="end" data-op="fh"><svg class="ico" aria-hidden="true"><use href="#i-flip-h"/></svg> Flip H</button><button data-f="end" data-op="fv"><svg class="ico" aria-hidden="true"><use href="#i-flip-v"/></svg> Flip V</button><canvas id="lxCanvEnd" style="width:120px;border-radius:6px;border:1px solid var(--border);background:#000"></canvas></div>
+        <div class="hint">Interpolation between 2 images. If the backend handles only 1 frame, only the start frame is used (= i2v).</div>
+      </div>
+      <div id="lxLongBlock" style="display:none">
+        <label for="lxLongSec">Target duration (seconds)</label>
+        <input id="lxLongSec" type="number" value="20" min="6" max="120" step="1">
+        <div class="hint" id="lxLongPlan" style="color:var(--accent3)"></div>
+      </div>
+      <div class="irow">
+        <label>Width<input id="lxW" type="number" value="704" step="32" min="64"></label>
+        <label>Height<input id="lxH" type="number" value="416" step="32" min="64"></label>
+        <label>Frames<input id="lxF" type="number" value="97" min="1"></label>
+      </div>
+      <div class="irow">
+        <label>Quality<select id="lxQ"><option value="quick">quick</option><option value="balanced">balanced</option><option value="standard" selected>standard</option><option value="high">high (>=32 GB)</option></select></label>
+        <label>Seed<input id="lxSeed" type="number" value="-1"></label>
+      </div>
+      <div id="lxBudget" class="hint" style="font-size:var(--fs-2xs);padding:4px 8px;border-radius:6px;border:1px solid var(--border);line-height:1.5"></div>
+      <button class="btn" id="lxGo" style="margin-top:8px;width:100%">✦ Start the render</button>
+      <button class="load" id="lxChainCancel" style="display:none;margin-top:8px;border-color:rgba(255,80,80,.5);color:var(--alert-ink)">✕ Cancel the chain</button>
+      <div id="lxStatus"></div>
+    </div>
+    <div class="card">
+      <div class="dhead" style="margin-bottom:8px"><strong>Result</strong><span class="spacer"></span><button class="load" id="lxReload" style="width:auto;padding:4px 8px"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg> Latest output</button></div>
+      <div id="lxResult"><div class="empty">The rendered clip will appear here.</div></div>
+    </div>
+  </div>
+</div>
+<!-- Weekly top 10: left side drawer, no longer covers the videos -->
+<button id="t10Tab" class="t10tab" title="The week's heaviest renders" style="display:none"><svg class="ico" aria-hidden="true"><use href="#i-layers"/></svg><span>TOP 10</span></button>
+<aside id="t10Drawer" class="t10drawer">
+  <div class="t10head"><strong><svg class="ico" aria-hidden="true"><use href="#i-layers"/></svg> Heaviest this week</strong><button id="t10Close" title="close">✕</button></div>
+  <ol id="t10List"></ol>
+  <div class="t10foot">Ranked on pixel-frames — measured, never scored.</div>
+</aside>
+<aside id="monPanel" class="monpanel">
+  <h3><span><svg class="ico" aria-hidden="true"><use href="#i-antenna"/></svg> M4 monitor</span><button id="monClose" style="background:none;border:0;color:rgba(var(--ink-rgb),.5);cursor:pointer;font-size:var(--fs-lg)" title="close">✕</button></h3>
+  <div id="monBody" style="font-size:var(--fs-xs);line-height:1.6"></div>
+</aside>
+<div id="helpModal" class="ovl">
+  <div class="ovl-card">
+    <h3>Keyboard shortcuts</h3>
+    <div class="ovl-row"><span><kbd>Ctrl</kbd>+<kbd>1..9</kbd></span><span>switch tab</span></div>
+    <div class="ovl-row"><span><kbd>Ctrl</kbd>+<kbd>↵</kbd></span><span>start the render (LTX / Images)</span></div>
+    <div class="ovl-row"><span><kbd>V</kbd></span><span>Voice dictation (active tab's prompt)</span></div>
+    <div class="ovl-row"><span><kbd>←</kbd> <kbd>→</kbd></span><span>previous / next in the player</span></div>
+    <div class="ovl-row"><span><kbd>m</kbd></span><span>M4 monitor</span></div>
+    <div class="ovl-row"><span><kbd>?</kbd></span><span>this help</span></div>
+    <div class="ovl-row"><span><kbd>Esc</kbd></span><span>close</span></div>
+    <button id="helpClose" class="iconbtn" style="margin-top:12px;padding:4px 12px">Close</button>
+  </div>
+</div>
+<script>
+let BK=(/^https?:/.test(location.protocol)&&location.hostname&&location.port=='8200')?location.origin:'http://127.0.0.1:8200';const base=()=>BK, H={'ngrok-skip-browser-warning':'1'};
+// Resilient storage: in a sandboxed iframe WITHOUT allow-same-origin (e.g. host-html),
+// localStorage throws SecurityError -> these wrappers keep the script alive.
+const SS={get(k){try{return localStorage.getItem(k)}catch(_){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(_){}}};
+let VOL=parseFloat(SS.get('phos_volume')||'0.35');if(isNaN(VOL))VOL=0.35;
+// Generator/Storyboard/Gallery tabs: served by the proxy (/generator…) over http,
+// but loaded from the sibling HTML files when index.html is opened as file://
+// (the proxy does not serve those paths -> otherwise the tab stays blank).
+const PAGE_FILES={generator:'generator.html',storyboard:'storyboard.html',doc:'doc.html'};
+const onFile=location.protocol==='file:';
+const pageURL=v=>onFile?PAGE_FILES[v]:base()+'/'+v;
+// v4: native data-v views -> [id, init]. Gallery/Playlists/Doc live in the
+// v4 module (second <script>) — resolved on click, never at parse time.
+// v4 fix: only buttons WITH data-v drive the views (before, clicking ⌨ or
+// "Close" disabled every view -> blank page + TypeError f-undefined).
+const NATIVE_VIEWS={dash:['dash',()=>{loadDash(false);window.BalancePanel&&BalancePanel.render();}],images:['imggen',()=>initImg()],ltx:['ltx',()=>initLtx()],
+ gallery:['gal',()=>window.Gal&&Gal.init()],plists:['plists',()=>window.PL&&PL.init()]};
+function showTab(v){const t=document.querySelector(`.tab[data-v="${v}"]`);if(t)t.click();}
+document.querySelectorAll('.tab[data-v]').forEach(t=>t.addEventListener('click',()=>{
+ document.querySelectorAll('.tab[data-v]').forEach(x=>x.classList.remove('active'));
+ document.querySelectorAll('iframe,.view').forEach(x=>x.classList.remove('active'));
+ t.classList.add('active');const v=t.dataset.v,nv=NATIVE_VIEWS[v];
+ if(nv){document.getElementById(nv[0]).classList.add('active');nv[1]();return;}
+ const f=document.getElementById('f-'+v);if(!f)return;if(!f.src)f.src=pageURL(v);f.classList.add('active');
+}));
+// deterministic hash -> stable per-video metrics
+function h32(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+// Minimal HTML escaping for names/prompts injected through innerHTML.
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// ── Measured facts, not scores ────────────────────────────────────────────
+// Everything the dashboard shows is derived from the file itself and from the
+// sidecar the render backend writes beside it. Nothing here is invented.
+const MB = 1048576;
+function metrics(o){
+ const p = o.params || {};
+ const w = +p.width || 0, h = +p.height || 0, f = +p.frames || 0;
+ const fps = +p.fps || 24;
+ const seconds = (f && fps) ? f / fps : 0;
+ const px = (w * h * f) / 1e6;                       // M pixel-frames
+ const mb = (o.size || 0) / MB;
+ const mbps = seconds ? (o.size || 0) * 8 / seconds / 1e6 : 0;
+ const secs = +p.render_seconds || 0;
+ const steps = +p.steps || 0;
+ const sps = (secs && steps) ? secs / steps : 0;     // seconds per step
+ return {w, h, f, fps, seconds, px, mb, mbps, secs, steps, sps,
+         mode: p.mode || '', quality: p.quality || '', seed: p.seed};
+}
+// The 16 GB budget, from the measurements in the README: 35 M pixel-frames
+// renders at ~12 s/step, while 221 M swaps and collapses to ~104 s/step.
+const BUDGET_OK = 40, BUDGET_WARN = 80;
+// Long mode renders ~5 s passes and joins them, so the budget — a per-pass
+// limit — must not be applied to the total. A 20 s chain totals 150 M while
+// every pass that made it stayed under 40 M.
+const budgetLevel = (px, mode) => mode === 'long' ? 'chained'
+  : px <= BUDGET_OK ? 'ok' : px <= BUDGET_WARN ? 'warn' : 'bad';
+const BUDGET_COLOR = {ok:'var(--accent2)', warn:'#ff9d00', bad:'var(--c-break)', chained:'var(--accent)'};
+const BUDGET_WORD  = {ok:'within budget', warn:'tight', bad:'over budget',
+                      chained:'chained in Long mode — the budget applies per pass'};
+const fmtDur  = s => !s ? '—' : s >= 60 ? `${Math.floor(s/60)}m ${Math.round(s%60)}s` : `${s.toFixed(1)}s`;
+const fmtMB   = m => !m ? '—' : m >= 1024 ? `${(m/1024).toFixed(1)} GB` : `${m.toFixed(1)} MB`;
+const fmtPx   = v => !v ? '—' : `${v.toFixed(0)} M`;
+async function sidecarPrompt(path){try{const d=await (await fetch(base()+'/sidecar?path='+encodeURIComponent(path),{headers:H})).json();return (d.params||d).prompt||''}catch(_){return ''}}
+// ═══ v4: shared /outputs cache (dashboard, gallery, playlists, top10, lxSrc) ═══
+function outTs(o){const mt=o.mtime_ts??o.mtime_unix??o.mtime;if(typeof mt==='number')return mt>1e12?mt:mt*1000;if(typeof mt==='string')return Date.parse(mt)||0;return 0;}
+const Outputs={data:null,at:0,inflight:null,
+ async get(force){if(!force&&this.data&&Date.now()-this.at<60000)return this.data;
+  if(this.inflight)return this.inflight;
+  const p=(async()=>{try{const d=await (await fetch(base()+'/outputs?limit=500',{headers:H})).json();
+    this.data=(d.outputs||[]).map(o=>{o.ts=outTs(o);return o;});this.at=Date.now();return this.data;}
+   finally{this.inflight=null;}})();
+  this.inflight=p;return p;}};
+const _scCache=new Map();
+async function outPrompt(o){if(o.prompt)return o.prompt;if(!o.has_sidecar)return '';
+ if(_scCache.has(o.path)){o.prompt=_scCache.get(o.path);return o.prompt;}
+ const p=await sidecarPrompt(o.path);_scCache.set(o.path,p);o.prompt=p;return p;}
+let dashBusy=false,dashSort='date',dashQ='',dashAutoT=null;
+function kpi(v,l,s){return `<div class="kpi"><b>${v}</b><span>${l}</span>${s?`<small>${s}</small>`:''}</div>`}
+async function loadDash(force=true){const g=document.getElementById('dGrid'),e=document.getElementById('dEmpty'),k=document.getElementById('dKpis');
+ if(dashBusy)return;dashBusy=true;
+ if(!g.children.length)g.innerHTML='<div class="sk" style="height:150px;grid-column:1/-1"></div>';
+ let outs=[];
+ try{outs=await Outputs.get(force)}
+ catch(_){g.innerHTML='<div class="empty">✗ /outputs unreachable (is the proxy running?)</div>';k.innerHTML='';renderTop10([]);renderTimeline([]);dashBusy=false;return}
+ renderTimeline(outs);
+ const vids=outs.filter(o=>o.kind==='video'),shown=vids.slice(0,80);
+ // Sidecars in parallel + cached (the axes and the search read the prompt).
+ await Promise.all(shown.filter(o=>o.has_sidecar).map(o=>outPrompt(o).catch(()=>{})));
+ const scored=shown.map(o=>({o,m:metrics(o)}));
+ // ── KPIs: totals, not scores ──
+ const week=Date.now()-7*864e5,v7=vids.filter(o=>o.ts>=week).length;
+ const imgs=outs.filter(o=>o.kind==='image').length;
+ const totalSec=scored.reduce((a,s)=>a+s.m.seconds,0);
+ const totalMB=scored.reduce((a,s)=>a+s.m.mb,0);
+ const withStep=scored.filter(s=>s.m.sps>0);
+ const avgSps=withStep.length?withStep.reduce((a,s)=>a+s.m.sps,0)/withStep.length:0;
+ // Chained clips are not in any band: the budget is a per-pass limit and a
+ // joined chain has no single pass to measure against.
+ const budgetNote=rows=>{
+  const lv=rows.map(s=>budgetLevel(s.m.px,s.m.mode));
+  const bad=lv.filter(l=>l==='bad').length, warn=lv.filter(l=>l==='warn').length;
+  const chained=lv.filter(l=>l==='chained').length;
+  const parts=[];
+  if(bad)parts.push(bad+' over budget');
+  if(warn)parts.push(warn+' tight');
+  if(chained)parts.push(chained+' chained');
+  return parts.length?parts.join(' · '):'all within budget';};
+ k.innerHTML=kpi(vids.length,'videos','+ '+imgs+' image'+(imgs>1?'s':''))
+  +kpi(v7,'renders · 7 days',v7?'the machine is running':'fire the machine up!')
+  +kpi(fmtDur(totalSec),'total footage',scored.length+' clip'+(scored.length>1?'s':''))
+  +kpi(fmtMB(totalMB),'on disk',totalMB?`${(totalMB/Math.max(1,scored.length)).toFixed(1)} MB avg`:'—')
+  +kpi(avgSps?avgSps.toFixed(1)+' s':'—','per diffusion step',budgetNote(scored));
+ // ── filtre + tri ──
+ const q=dashQ.trim().toLowerCase();
+ const view=(q?scored.filter(s=>(s.o.name+' '+(s.o.prompt||'')).toLowerCase().includes(q)):scored.slice());
+ const SORTS={date:s=>s.o.ts,duration:s=>s.m.seconds,size:s=>s.m.mb,budget:s=>s.m.px,render:s=>s.m.secs};
+ const keyF=SORTS[dashSort]||SORTS.date;
+ view.sort((a,b)=>keyF(b)-keyF(a));
+ e.style.display=view.length?'none':'block';
+ g.innerHTML='';
+ for(const s of view){const{o,m}=s;
+  const c=document.createElement('div');c.className='card';
+  c.innerHTML=`<div class="gthumb" style="border-radius:10px" title="▶ open in the player"><img loading="lazy" alt="" src="${base()}/thumb?path=${encodeURIComponent(o.path||'')}" onerror="this.outerHTML='&lt;div class=gph&gt;&lt;/div&gt;'"><div class="gover"><button data-a="play" title="lire">▶</button><button data-a="frame" title="extract a frame"><svg class="ico" aria-hidden="true"><use href="#i-image"/></svg></button><button data-a="extend" title="extend in LTX">⏩</button><button data-a="pl" title="add to a playlist"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button></div></div>
+   <div class="cname" style="margin-top:8px">${esc(o.name)}</div>
+   <div class="cfacts">${m.seconds?fmtDur(m.seconds):'—'} · ${m.w?`${m.w}×${m.h}`:'—'} · ${m.f?m.f+' f':'—'} · ${fmtMB(m.mb)}</div>
+   ${m.px?`<div class="budget" title="${m.px.toFixed(0)} M pixel-frames — ${BUDGET_WORD[budgetLevel(m.px,m.mode)]}">
+     <span class="bbar"><i style="width:${Math.min(100,m.px/BUDGET_WARN*100).toFixed(0)}%;background:${BUDGET_COLOR[budgetLevel(m.px,m.mode)]}"></i></span>
+     <span class="bval">${fmtPx(m.px)} px-f</span></div>`:''}
+   ${m.secs?`<div class="cfacts dim">⏱ ${fmtDur(m.secs)} render${m.sps?` · ${m.sps.toFixed(1)} s/step`:''}${m.quality?` · ${esc(m.quality)}`:''}</div>`:''}`;
+  c.querySelector('.gthumb').addEventListener('click',ev=>{const b=ev.target.closest('button');const act=b?b.dataset.a:'play';
+   if(act==='play'&&window.Gal)Gal.open(o,view.map(x=>x.o));
+   else if(act==='frame'&&window.FS)FS.open(o);
+   else if(act==='extend')ltxExtendFrom(o.path,o.name);
+   else if(act==='pl'&&window.PL)PL.pick(o);});
+  g.appendChild(c);}
+ renderTop10(scored);
+ dashBusy=false;
+}
+// The week's ten heaviest renders, ranked on pixel-frames — the figure that
+// decides whether a re-render fits in unified memory. Takes the dashboard's
+// {o, m} rows so both callers share one definition of "heavy".
+function renderTop10(scored){const list=document.getElementById('t10List'),tab=document.getElementById('t10Tab'),dr=document.getElementById('t10Drawer');if(!list)return;
+ const wk=Date.now()/1000-7*86400;
+ // numeric mtime when available -> 7-day filter; otherwise rank the whole recent batch.
+ let pool=(scored||[]).filter(s=>{const t=s.o.mtime_ts||s.o.mtime;return typeof t==='number'?t>=wk:true;});
+ if(!pool.length)pool=(scored||[]).slice();
+ pool.sort((a,b)=>(b.m?b.m.px:0)-(a.m?a.m.px:0));
+ const top=pool.slice(0,10);
+ const open=dr&&dr.classList.contains('open');
+ if(tab)tab.style.display=(top.length&&!open)?'flex':'none';
+ if(!top.length){list.innerHTML='<li style="opacity:.6;font-size:var(--fs-xs);padding:8px">No video this week — generate a clip.</li>';return;}
+ list.innerHTML=top.map((s,i)=>{const rk='#'+(i+1);const u=base()+s.o.url;
+  const m=s.m||{},lv=budgetLevel(m.px||0,m.mode);
+  const sub=`${m.w||'?'}×${m.h||'?'} · ${m.f||'?'} f · ${(m.seconds||0).toFixed(1)} s`;
+  return `<li class="t10"><span class="rk">${rk}</span><span class="t10b"><a class="t10n" href="${u}" target="_blank" rel="noopener" title="open the video in a tab">${esc(s.o.name)}</a><span class="t10c">${sub}</span></span><span class="t10s" title="pixel-frame budget"><span class="dot ${lv}"></span> ${Math.round(m.px||0)} M</span></li>`;}).join('');
+}
+// Top 10 drawer: open/close from the left side tab.
+(function(){const tab=document.getElementById('t10Tab'),dr=document.getElementById('t10Drawer'),cl=document.getElementById('t10Close');if(!tab||!dr)return;
+ tab.addEventListener('click',()=>{dr.classList.add('open');tab.style.display='none';});
+ if(cl)cl.addEventListener('click',()=>{dr.classList.remove('open');if(document.getElementById('t10List').children.length)tab.style.display='flex';});
+})();
+document.getElementById('dRefresh').addEventListener('click',()=>loadDash(true));
+document.getElementById('dSearch').addEventListener('input',e=>{dashQ=e.target.value;loadDash(false);});
+// One sort button per axis declared "sortable" in the metrics config.
+document.getElementById('dSort').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;dashSort=b.dataset.s;
+ document.querySelectorAll('#dSort button').forEach(x=>x.classList.toggle('on',x===b));loadDash(false);});
+document.getElementById('dAuto').addEventListener('change',e=>{if(dashAutoT){clearInterval(dashAutoT);dashAutoT=null;}
+ if(e.target.checked)dashAutoT=setInterval(()=>{if(document.getElementById('dash').classList.contains('active'))loadDash(true);},30000);});
+async function health(){try{const d=await (await fetch(base()+'/health',{headers:H})).json();
+ document.getElementById('dPh').style.background=d.phosphene?'#66f0b8':'#ff5050';
+ document.getElementById('dOl').style.background=d.ollama?'#66f0b8':'#ff5050';
+ const pv=document.getElementById('pxVer');if(pv){pv.textContent=d.version?('proxy '+d.version):'⚠ stale proxy';pv.style.color=d.version?'var(--ok-ink)':'var(--alert-ink)';}
+ const rb=document.getElementById('ramBadge');if(rb&&d.system&&d.system.ram_total_gb){const s=d.system,pct=s.ram_pct||0,free=s.ram_free_gb,tot=s.ram_total_gb;rb.textContent=`${free} GB free / ${tot} GB`;rb.title=`RAM: ${s.ram_used_gb} GB used / ${tot} GB (${pct}%) · free disk: ${s.disk_free_gb||'?'} GB`;rb.style.color=pct>90?'var(--bad-ink)':pct>75?'var(--warn-ink)':'var(--ok-ink)';}
+ const p=document.getElementById('modelPick');if(d.models&&d.models.length&&p.dataset.k!=d.models.join()){p.dataset.k=d.models.join();p.innerHTML=d.models.map(m=>`<option ${m===d.model?'selected':''}>${m}</option>`).join('')}
+ else if(!p.options.length)p.innerHTML=`<option>${d.model||'—'}</option>`}catch(_){const pv=document.getElementById('pxVer');if(pv){pv.textContent='⚠ proxy unreachable';pv.style.color='var(--alert-ink)';}}}document.getElementById('modelPick').addEventListener('change',e=>{fetch(base()+'/model',{method:'POST',headers:{'Content-Type':'application/json',...H},body:JSON.stringify({model:e.target.value})}).catch(()=>{})});
+const FB=(window.FIREBASE_DB||'')+'/tunnel/url.json';  // empty = discovery disabled
+function applyBK(u){if(!u)return;BK=u.replace(/\/+$/,'');document.getElementById('ep').value=BK;if(!onFile)['generator','storyboard'].forEach(v=>{const f=document.getElementById('f-'+v);if(f.src)f.src=BK+'/'+v;});}
+async function resolveBackend(){
+ // Priority: the Cloudflare URL published on Firebase, otherwise localhost.
+ try{const u=await (await fetch(FB,{cache:'no-store'})).json();if(u){applyBK(u);return;}}catch(_){}
+ // The proxy serves this page, so its own origin IS the backend -- whatever
+ // port it was started on. Pinning 8200 sent any other port to a server that
+ // may not be there, or to somebody else's.
+ if(/^https?:/.test(location.protocol)){applyBK(location.origin);return;}
+ applyBK('http://127.0.0.1:8200');
+}
+document.getElementById('ep').addEventListener('change',e=>{applyBK(e.target.value);health();loadDash();});
+/* ── Draw Things: Images page ────────────────────────────────────────
+   The endpoint is derived from the backend (base()+'/dt') -> SAME ORIGIN as the
+   Phosphene pages: works locally, over HTTPS and through the tunnel, with no
+   hardcoded endpoint. A manual override stays possible (dtEp field). */
+let dtOverride=SS.get('dtEp')||'';
+const dtBase=()=>(dtOverride?dtOverride.replace(/\/+$/,''):base()+'/dt');
+function b64ToBlob(b64,mime){const bin=atob(b64),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime||'image/png'});}
+function dtStamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;}
+function dlImg(b64,name){const a=document.createElement('a');a.href='data:image/png;base64,'+b64;a.download=name;document.body.appendChild(a);a.click();a.remove();}
+// Send the image to the generator's i2v uploader. Same origin -> direct
+// injection into the <input type=file>; otherwise (separate tunnel) -> download.
+function dlBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();}
+function toI2VBlob(blob,name){
+ const tab=document.querySelector('.tab[data-v="generator"]');if(tab)tab.click();
+ const file=new File([blob],name||`drawthings_${dtStamp()}.png`,{type:blob.type||'image/png'});
+ setTimeout(()=>{
+  try{
+   const f=document.getElementById('f-generator');
+   const doc=f.contentDocument||(f.contentWindow&&f.contentWindow.document);
+   const inp=doc&&[...doc.querySelectorAll('input[type=file]')].find(i=>!i.accept||/image|\*/i.test(i.accept));
+   if(!inp)throw new Error('input i2v introuvable');
+   const dt=new DataTransfer();dt.items.add(file);inp.files=dt.files;
+   inp.dispatchEvent(new Event('change',{bubbles:true}));
+  }catch(e){
+   dlBlob(file,file.name);
+   alert("Generator on a different origin: image downloaded — drag it into the i2v uploader.");
+  }
+ },400);
+}
+function toI2V(b64){toI2VBlob(b64ToBlob(b64),`drawthings_${dtStamp()}.png`);}
+async function toI2VFromUrl(u,name){try{toI2VBlob(await (await fetch(u,{headers:H})).blob(),name);}catch(e){alert('✗ '+e.message);}}
+// Gallery of the images stored on the render machine (/img-list -> /img-file).
+// Extended shape: every image has a stable md5 "key" (used by /img-file?key=)
+// that survives moves and renames on the proxy side.
+async function igLoadStored(){const g=document.getElementById('igStored'),e=document.getElementById('igStoredEmpty');if(!g)return;
+ try{const d=await (await fetch(base()+'/img-list',{headers:H})).json();
+  // Use `extended` when available (otherwise fall back to legacy images[]).
+  const arr=d.extended||d.images||[];
+  e.style.display=arr.length?'none':'block';g.innerHTML='';
+  // Also show the scanned roots when the list is empty (diagnostic aid)
+  if(!arr.length && d.roots_scanned){
+   e.textContent='No image found. Roots scanned: '+d.roots_scanned.join(' · ')+(d.roots_scanned.length?'':' (no DrawThings directory detected on the render host)');
+  }
+  arr.forEach(it=>{
+   const u=base()+it.url;const c=document.createElement('div');c.className='card';
+   const sub=it.rel?` · ${it.rel}`:'';
+   c.innerHTML=`<img loading="lazy" src="${u}" alt=""><div class="cname">${esc(it.name)}<span style="opacity:.5">${esc(sub)}</span></div><div class="igbtns"><button class="btn b-i2v">→ i2v</button><button class="load b-dl" title="download"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg></button></div>`;
+   c.querySelector('.b-i2v').addEventListener('click',()=>toI2VFromUrl(u,it.name));
+   c.querySelector('.b-dl').addEventListener('click',()=>{const a=document.createElement('a');a.href=u;a.download=it.name;document.body.appendChild(a);a.click();a.remove();});
+   g.appendChild(c);});}
+ catch(_){if(e){e.style.display='block';e.textContent='✗ /img-list unreachable (is the proxy up to date?)';}}}
+// Wide scan: list EVERY DrawThings image on the machine (Assets, Generated, Pictures…)
+async function igScanAll(){
+ const g=document.getElementById('igScanGrid'),e=document.getElementById('igScanEmpty'),st=document.getElementById('igScanStat'),btn=document.getElementById('igScanAll');
+ if(!g)return;
+ const oBtn=btn.textContent;btn.disabled=true;btn.setAttribute('aria-busy','true');
+ if(st)st.textContent='scanning…';
+ g.innerHTML='';if(e)e.style.display='none';
+ try{
+  const d=await (await fetch(base()+'/img-scan?limit=600',{headers:H})).json();
+  const arr=d.images||[];
+  if(st){
+   const roots=d.roots_scanned.length?d.roots_scanned.length+' racines':'(no DrawThings root found)';
+   st.textContent=`${arr.length} images · ${roots}`;
+  }
+  if(!arr.length){
+   if(e){const rs=d.roots_scanned||[];const sp=d.roots_from_spotlight||[];e.style.display='block';e.textContent=rs.length?('0 images found in '+rs.length+' racines : '+rs.join(' · ')+(sp.length?' (+ Spotlight : '+sp.join(' · ')+')':'')+ ' — check that Draw Things has generated images (png/jpg/webp) in those directories.'):('No DrawThings directory detected on the render host. Is the app installed? Is the proxy up to date?');}
+   return;
+  }
+  // Group by root to get a readable label
+  const byRoot={};arr.forEach(it=>{byRoot[it.root]=byRoot[it.root]||[];byRoot[it.root].push(it);});
+  for(const [root,items] of Object.entries(byRoot)){
+   const hdr=document.createElement('div');
+   hdr.style.cssText='grid-column:1/-1;font-size:var(--fs-2xs);opacity:.7;margin:12px 0 4px;letter-spacing:.05em;text-transform:uppercase';
+   hdr.textContent=`📁 ${root} (${items.length})`;
+   g.appendChild(hdr);
+   items.forEach(it=>{
+    const u=base()+it.url;const c=document.createElement('div');c.className='card';
+    const sizeMB=(it.size/1048576).toFixed(1);
+    c.innerHTML=`<img loading="lazy" src="${u}" alt=""><div class="cname">${esc(it.name)}<span style="opacity:.5"> · ${sizeMB} MB</span></div><div class="igbtns"><button class="btn b-i2v">→ i2v</button><button class="load b-dl" title="download"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg></button></div>`;
+    c.querySelector('.b-i2v').addEventListener('click',()=>toI2VFromUrl(u,it.name));
+    c.querySelector('.b-dl').addEventListener('click',()=>{const a=document.createElement('a');a.href=u;a.download=it.name;document.body.appendChild(a);a.click();a.remove();});
+    g.appendChild(c);
+   });
+  }
+ }catch(err){
+  if(e){e.style.display='block';e.textContent='✗ /img-scan unreachable: '+err.message+' (is the proxy up to date?)';}
+  if(st)st.textContent='✗ '+err.message;
+ }finally{
+  btn.disabled=false;btn.removeAttribute('aria-busy');btn.textContent=oBtn;
+ }}
+let dtDown=0;   // consecutive failures -> how long to wait before the next try
+async function dtHealth(){const d=document.getElementById('dDt');if(!d)return;
+ try{const r=await fetch(dtBase()+'/',{cache:'no-store',headers:H});d.style.background=r.ok?'#66f0b8':'#ff5050';dtDown=r.ok?0:dtDown+1;}
+ catch(_){d.style.background='#ff5050';dtDown++;}}
+function addImgCard(b64,p,secs){
+ const out=document.getElementById('igOut'),c=document.createElement('div');c.className='card';
+ const oe=document.getElementById('igOutEmpty');if(oe)oe.style.display='none';
+ const name=`drawthings_${dtStamp()}.png`;
+ c.innerHTML=`<img src="data:image/png;base64,${b64}" alt="">
+  <div class="cname">${p.width}×${p.height} · ${p.steps} steps · cfg ${p.cfg_scale} · seed ${p.seed} · ${secs}s</div>
+  <div class="igbtns"><button class="btn b-i2v">→ Send to i2v</button><button class="load b-dl"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg> Download</button></div>`;
+ c.querySelector('.b-i2v').addEventListener('click',()=>toI2V(b64));
+ c.querySelector('.b-dl').addEventListener('click',()=>dlImg(b64,name));
+ out.prepend(c);
+}
+// Image progress bar: Draw Things does not stream progress, so it is
+// estimated from elapsed vs expected time (~ steps + resolution). Labelled "est."
+let igTimer=null;
+function igProgStart(){if(igTimer)clearInterval(igTimer);const box=document.getElementById('igProg');if(!box)return;
+ const bar=box.querySelector('i'),txt=box.querySelector('.igprog-txt'),t0=performance.now();
+ box.style.display='block';bar.style.width='0';
+ // Draw Things does not stream progress -> we do NOT invent an ETA. Asymptotic
+ // progress bar (approaches 92% without reaching it) + real elapsed time.
+ igTimer=setInterval(()=>{const el=(performance.now()-t0)/1000,pct=92*(1-Math.exp(-el/22));
+  bar.style.width=pct.toFixed(1)+'%';txt.textContent=`⏳ ${el.toFixed(1)}s elapsed · generating…`;},150);}
+function igProgDone(ok,secs){if(igTimer){clearInterval(igTimer);igTimer=null;}const box=document.getElementById('igProg');if(!box)return;
+ const bar=box.querySelector('i'),txt=box.querySelector('.igprog-txt');
+ bar.style.width='100%';txt.textContent=ok?`✓ image generated in ${secs}s`:`✗ failed after ${secs}s`;
+ setTimeout(()=>{if(!igTimer)box.style.display='none';},2800);}
+async function genImage(){
+ const btn=document.getElementById('igGo'),st=document.getElementById('igStatus');
+ const payload={prompt:document.getElementById('igPrompt').value.trim(),negative_prompt:document.getElementById('igNeg').value.trim(),
+  width:+document.getElementById('igW').value||1024,height:+document.getElementById('igH').value||1024,
+  steps:+document.getElementById('igSteps').value||4,cfg_scale:+document.getElementById('igCfg').value||1,
+  seed:+document.getElementById('igSeed').value||-1};
+ const mdl=document.getElementById('igModel').value;if(mdl)payload.override_settings={sd_model_checkpoint:mdl};
+ // img2img when a start image is loaded
+ const i2i=!!igInitB64;let endpoint='/sdapi/v1/txt2img';
+ if(i2i){endpoint='/sdapi/v1/img2img';payload.init_images=[igInitB64];payload.denoising_strength=+document.getElementById('igDenoise').value||0.65;}
+ if(!payload.prompt){st.textContent='Empty prompt.';return;}
+ btn.disabled=true;btn.setAttribute('aria-busy','true');st.textContent=(i2i?'img2img':'Draw Things')+' travaille (10–60 s)…';
+ const t0=performance.now();igProgStart();
+ try{
+  const r=await fetch(dtBase()+endpoint,{method:'POST',headers:{'Content-Type':'application/json',...H},body:JSON.stringify(payload)});
+  if(!r.ok)throw new Error('HTTP '+r.status+(r.status===502?' — Draw Things unreachable: enable the API Server in Draw Things (Advanced -> API, port 7860). Same cause for txt2img.':r.status===404&&i2i?' — this model does not support img2img':''));
+  const d=await r.json().catch(()=>null);
+  if(!d)throw new Error('non-JSON response — stale /dt proxy? redeploy the latest proxy version and restart');
+  const imgs=d.images||[];
+  if(!imgs.length)throw new Error('response with no image');
+  const secs=((performance.now()-t0)/1000).toFixed(1);igProgDone(true,secs);
+  imgs.forEach(b64=>addImgCard(b64,payload,secs));
+  // persist on the render machine then refresh the stored gallery
+  Promise.all(imgs.map(b64=>fetch(base()+'/img-save',{method:'POST',headers:{'Content-Type':'application/json',...H},body:JSON.stringify({image:b64})}).catch(()=>{}))).then(igLoadStored);
+  st.textContent=`✓ ${imgs.length} image(s) en ${secs}s`;
+ }catch(e){st.textContent='✗ '+e.message;igProgDone(false,((performance.now()-t0)/1000).toFixed(1));}
+ finally{btn.disabled=false;btn.removeAttribute('aria-busy');btn.textContent='✦ Generate';}
+}
+// ADAPTIVE style buttons: they rewrite the CURRENT prompt into English
+// through the LLM (/imgprompt route) instead of inserting fixed text.
+const IG_STYLES=['Photoreal','Cinematic','Anime','3D render','Concept art','Noir'];
+async function igStyle(style,btn){const ta=document.getElementById('igPrompt'),st=document.getElementById('igStatus');
+ const idea=ta.value.trim();if(!idea){st.textContent='Write an idea first.';return;}
+ const lbl=style||'enhance',old=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.setAttribute('aria-busy','true');}
+ st.textContent='LLM rewrite ('+lbl+')…';
+ try{const msg=(style?('STYLE: '+style+'\n\n'):'')+'IDEA: '+idea;
+  const r=await fetch(base()+'/imgprompt',{method:'POST',headers:{'Content-Type':'application/json',...H},body:JSON.stringify({prompt:msg})});
+  const d=await r.json().catch(()=>null);
+  if(!d)throw new Error('non-JSON response (HTTP '+r.status+') — stale proxy? redeploy the latest version');
+  if(!r.ok||!d.prompt)throw new Error(d.error||('HTTP '+r.status));
+  ta.value=d.prompt;st.textContent='✓ prompt rewritten ('+lbl+', EN)';}
+ catch(e){st.textContent='✗ LLM: '+e.message;}
+ finally{if(btn){btn.disabled=false;btn.removeAttribute('aria-busy');btn.textContent=old;}}}
+function buildStyleBtns(){const c=document.getElementById('igChips');if(!c||c.dataset.built)return;c.dataset.built='1';
+ IG_STYLES.forEach(s=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=s;b.title='Rewrite the prompt in '+s+' style (English, LLM)';b.addEventListener('click',()=>igStyle(s,b));c.appendChild(b);});}
+// List the models installed in Draw Things and tune steps/CFG to the chosen type
+// (few-step distilled FLUX.2/Turbo -> 4 steps/CFG1; SD/SDXL -> 25 steps/CFG6).
+function igModelDefaults(name){const n=(name||'').toLowerCase();
+ const distilled=/flux\.?2|klein|turbo|schnell|lightning|hyper|lcm|z[\s_-]?image|jaguar|shuttle/.test(n);
+ document.getElementById('igSteps').value=distilled?4:25;
+ document.getElementById('igCfg').value=distilled?1:6;}
+async function igLoadModels(){const sel=document.getElementById('igModel');if(sel.dataset.loaded)return;
+ try{const r=await fetch(dtBase()+'/sdapi/v1/sd-models',{headers:H});const arr=await r.json();
+  const opts=(Array.isArray(arr)?arr:[]).map(m=>m.model_name||m.title||m.name||m.filename).filter(Boolean);
+  if(!opts.length)throw new Error('empty list');
+  sel.innerHTML=opts.map(v=>`<option value="${v}">${v}</option>`).join('');
+  const flux=[...sel.options].find(o=>/flux\.?2|klein/i.test(o.value));if(flux)sel.value=flux.value;
+  sel.dataset.loaded='1';igModelDefaults(sel.value);}
+ catch(e){sel.innerHTML='<option value="">(models unavailable — is Draw Things off?)</option>';}}
+function initImg(){const i=document.getElementById('dtEp');i.value=dtBase();i.placeholder='auto: '+base()+'/dt';buildStyleBtns();dtHealth();igLoadModels();igLoadStored();const pr=document.getElementById('igPrompt');if(pr)pr.focus();}
+document.getElementById('dtEp').addEventListener('change',e=>{dtOverride=e.target.value.trim();SS.set('dtEp',dtOverride);e.target.value=dtBase();document.getElementById('igModel').dataset.loaded='';dtHealth();igLoadModels();});
+document.getElementById('igModel').addEventListener('change',e=>igModelDefaults(e.target.value));
+// ---------- img2img: Draw Things start image ----------
+let igInitB64=null;
+document.getElementById('igInit').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;
+ const bmp=await createImageBitmap(f).catch(()=>null);if(!bmp){alert('image illisible');return;}
+ const m=Math.min(1,1024/Math.max(bmp.width,bmp.height));const cv=document.createElement('canvas');cv.width=Math.round(bmp.width*m);cv.height=Math.round(bmp.height*m);cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+ const dataUrl=cv.toDataURL('image/jpeg',0.85);igInitB64=dataUrl.split(',')[1];
+ document.getElementById('igInitImg').src=dataUrl;document.getElementById('igInitPrev').style.display='block';
+ document.getElementById('igW').value=cv.width;document.getElementById('igH').value=cv.height;
+ document.getElementById('i2iWrap').open=true;});
+document.getElementById('igInitClear').addEventListener('click',()=>{igInitB64=null;document.getElementById('igInit').value='';document.getElementById('igInitPrev').style.display='none';});
+document.getElementById('igDenoise').addEventListener('input',e=>{document.getElementById('igDenoiseVal').textContent=(+e.target.value).toFixed(2);});
+document.getElementById('igGo').addEventListener('click',genImage);
+document.getElementById('igEnrich').addEventListener('click',e=>igStyle('',e.currentTarget));
+document.getElementById('igReload').addEventListener('click',igLoadStored);
+document.getElementById('igScanAll').addEventListener('click',igScanAll);
+// ---------- Sequence tab: t2v / extend / frame-to-frame via /queue/add -> /status ----------
+let lxMode='t2v',lxPollT=null;
+const LX_HINTS={t2v:'Text -> video. Describe the whole scene.',extend:'Extends a video. The prompt describes how the motion continues.',keyframe:'Interpolates between 2 images. The prompt describes the motion between them.',long:'Automatic chain: one t2v then ~5 s extends. The prompt describes the scene; each segment extends the previous output. Zero thrashing.'};
+function lxSetMode(m){lxMode=m;
+ document.querySelectorAll('.ltxmode').forEach(b=>b.classList.toggle('active',b.dataset.m===m));
+ document.getElementById('lxExtendBlock').style.display=m==='extend'?'block':'none';
+ document.getElementById('lxKfBlock').style.display=m==='keyframe'?'block':'none';
+ document.getElementById('lxLongBlock').style.display=m==='long'?'block':'none';
+ document.getElementById('lxModeHint').textContent=LX_HINTS[m];
+ lxBudgetRender();lxLongPlanRender();}
+// ---------- 16 GB budget guardrail: frames x W x H (pixel-frames) ----------
+// Calibrated on the real 16 GB machine: 35 M = ~12 s/step (comfortable); 221 M =
+// 104 s/step (thrashing observed on a 768x608x473f i2v job). <=40 M green · <=80 M amber · beyond red.
+function lxBudgetCalc(f,w,h){const mpf=f*w*h/1e6;
+ const tStep=Math.max(4,12*Math.pow(mpf/35,1.17));           // interpolated s/step
+ const estMin=Math.max(1,Math.round(11*tStep*1.4/60));       // ~11 steps + 40% inter-stage/VAE
+ const level=mpf<=40?'ok':mpf<=80?'warn':'bad';
+ return {mpf,estMin,level,ratio:mpf/40};}
+function lxBudgetRender(){const el=document.getElementById('lxBudget');if(!el)return;
+ if(lxMode==='long'){el.style.borderColor='rgba(0,255,157,.5)';el.style.color='var(--ok-ink)';
+  el.textContent='✓ Long mode: each segment = 121 f at 704x416 max (~35 M) — always inside the 16 GB budget.';return;}
+ const f=+document.getElementById('lxF').value||0,w=+document.getElementById('lxW').value||0,h=+document.getElementById('lxH').value||0;
+ if(!f||!w||!h){el.textContent='';return;}
+ const b=lxBudgetCalc(f,w,h);
+ if(b.level==='ok'){el.style.borderColor='rgba(0,255,157,.5)';el.style.color='var(--ok-ink)';
+  el.textContent=`✓ ${b.mpf.toFixed(0)} M pixel-frames — within the 16 GB budget · ~${b.estMin} min (estimate)`;}
+ else if(b.level==='warn'){el.style.borderColor='rgba(255,170,0,.6)';el.style.color='#ffaa00';
+  el.textContent=`⚠ ${b.mpf.toFixed(0)} M pixel-frames (${b.ratio.toFixed(1)}x the budget) — slow, light swapping likely · ~${b.estMin} min (estimate)`;}
+ else{el.style.borderColor='rgba(255,80,80,.7)';el.style.color='var(--alert-ink)';
+  el.textContent=`⛔ ${b.mpf.toFixed(0)} M pixel-frames (${b.ratio.toFixed(1)}x the 16 GB budget) — budget exceeded · thrashing near certain, ~${b.estMin} min · use mode 📽 Long`;}}
+function lxLongPlanRender(){const el=document.getElementById('lxLongPlan');if(!el)return;
+ const sec=+document.getElementById('lxLongSec').value||20,n=Math.max(1,Math.round(sec/5));
+ el.textContent=`Plan: ${n} segment${n>1?'s':''} x ~5 s (121 f · 704x416) -> ~${n*5} s in total. Chained automatically.`;}
+['lxW','lxH','lxF'].forEach(id=>document.getElementById(id).addEventListener('input',lxBudgetRender));
+document.getElementById('lxLongSec').addEventListener('input',lxLongPlanRender);
+// Presets rapides
+document.getElementById('lxP4').addEventListener('click',()=>{lxSetMode('t2v');document.getElementById('lxW').value=704;document.getElementById('lxH').value=416;document.getElementById('lxF').value=97;document.getElementById('lxQ').value='quick';lxBudgetRender();});
+document.getElementById('lxP5').addEventListener('click',()=>{lxSetMode('t2v');document.getElementById('lxW').value=704;document.getElementById('lxH').value=416;document.getElementById('lxF').value=121;document.getElementById('lxQ').value='standard';lxBudgetRender();});
+document.getElementById('lxP20').addEventListener('click',()=>{document.getElementById('lxLongSec').value=20;lxSetMode('long');});
+function lxStat(msg,col){const e=document.getElementById('lxStatus');e.style.color=col||'var(--accent2)';e.textContent=msg;}
+// Snap the image to W×H (cover, /32) before upload — avoids LTX i2v/keyframe glitches.
+async function lxResize(file,w,h,tf){const bmp=await createImageBitmap(file).catch(()=>null);if(!bmp)return file;
+ const rot=((tf&&tf.rot)||0)%360,fH=!!(tf&&tf.fH),fV=!!(tf&&tf.fV),swap=(rot===90||rot===270);
+ const tw=swap?bmp.height:bmp.width,th=swap?bmp.width:bmp.height;
+ const c1=document.createElement('canvas');c1.width=tw;c1.height=th;const x1=c1.getContext('2d');
+ x1.translate(tw/2,th/2);x1.rotate(rot*Math.PI/180);x1.scale(fH?-1:1,fV?-1:1);x1.drawImage(bmp,-bmp.width/2,-bmp.height/2);
+ const c2=document.createElement('canvas');c2.width=w;c2.height=h;const x2=c2.getContext('2d');
+ const s=Math.max(w/tw,h/th),dw=tw*s,dh=th*s;x2.drawImage(c1,(w-dw)/2,(h-dh)/2,dw,dh);
+ return await new Promise(r=>c2.toBlob(r,'image/jpeg',0.92));}
+// Keyframe frame editor: 90° rotation + H/V mirror, live preview.
+const lxKfTf={start:{rot:0,fH:false,fV:false},end:{rot:0,fH:false,fV:false}};
+async function lxKfPreview(which){const inp=document.getElementById(which==='start'?'lxKfStart':'lxKfEnd');const f=inp.files[0];const edit=document.getElementById(which==='start'?'lxEditStart':'lxEditEnd');
+ if(!f){edit.style.display='none';return;}edit.style.display='flex';
+ const W=+document.getElementById('lxW').value||704,Hh=+document.getElementById('lxH').value||416;
+ const blob=await lxResize(f,W,Hh,lxKfTf[which]);const canv=document.getElementById(which==='start'?'lxCanvStart':'lxCanvEnd');
+ const bmp=await createImageBitmap(blob);canv.width=bmp.width;canv.height=bmp.height;canv.getContext('2d').drawImage(bmp,0,0);}
+document.getElementById('lxKfStart').addEventListener('change',()=>{lxKfTf.start={rot:0,fH:false,fV:false};lxKfPreview('start');});
+document.getElementById('lxKfEnd').addEventListener('change',()=>{lxKfTf.end={rot:0,fH:false,fV:false};lxKfPreview('end');});
+document.querySelectorAll('.lxedit button').forEach(b=>b.addEventListener('click',()=>{const f=b.dataset.f,op=b.dataset.op,t=lxKfTf[f];if(op==='rot')t.rot=(t.rot+90)%360;else if(op==='fh')t.fH=!t.fH;else if(op==='fv')t.fV=!t.fV;lxKfPreview(f);}));
+// Multipart upload ("image" field) -> server path (same route as the Generator).
+async function lxUpload(blob,name){const fd=new FormData();fd.append('image',blob,name||'frame.jpg');const r=await fetch(base()+'/upload',{method:'POST',headers:H,body:fd});const d=await r.json().catch(()=>null);if(!r.ok||!d||!d.path)throw new Error('/upload '+r.status+(d&&d.error?' · '+d.error:''));return d.path;}
+async function lxSrcList(){const s=document.getElementById('lxSrc');try{const outs=(await Outputs.get(false)).filter(o=>o.kind==='video').slice(0,40);s.innerHTML=outs.map(o=>`<option value="${esc(o.path||'')}">${esc(o.name)}</option>`).join('')||'<option value="">(no output)</option>';}catch(_){s.innerHTML='<option value="">✗ /outputs unreachable</option>';}}
+async function lxShowLatest(){const r=document.getElementById('lxResult');try{const outs=(await (await fetch(base()+'/outputs?limit=1',{headers:H})).json()).outputs||[];if(!outs.length){r.innerHTML='<div class="empty">No output.</div>';return;}const o=outs[0];const blob=await (await fetch(base()+o.url,{headers:H})).blob();r.innerHTML='';const v=document.createElement('video');v.controls=true;v.autoplay=true;v.volume=VOL;v.src=URL.createObjectURL(blob);r.appendChild(v);const c=document.createElement('div');c.className='hint';c.style.marginTop='6px';c.textContent=o.name;r.appendChild(c);}catch(e){r.innerHTML='<div class="empty">✗ '+e.message+'</div>';}}
+let lxPollUnknown=0;
+function lxPollStop(msg){if(lxPollT){clearInterval(lxPollT);lxPollT=null;}document.getElementById('lxGo').disabled=false;if(msg)lxStat(msg,'var(--accent3)');}
+async function lxPoll(id,t0){
+ // Safety stop: 4 h max, or 20 consecutive polls with no trace of the job (~2 min).
+ if(performance.now()-t0>4*3600*1000){lxPollStop('⏱ 4 h of polling — stopping (the job continues server-side, check the gallery).');return;}
+ try{const data=await (await fetch(base()+'/status',{headers:H})).json();const cur=data.current,inH=(data.history||[]).find(j=>j.id===id),inQ=(data.queue||[]).find(j=>j.id===id);const el=((performance.now()-t0)/1000).toFixed(0);
+ if(inH){lxPollUnknown=0;clearInterval(lxPollT);lxPollT=null;document.getElementById('lxGo').disabled=false;if(['done','completed'].includes(inH.status)){lxStat('✓ '+id+' · done in '+(inH.elapsed_sec?.toFixed?.(1)??el)+'s','var(--ok-ink)');lxShowLatest();}else{lxStat('✗ '+id+' · '+inH.status+'\n'+(inH.error||'(no detail)'),'var(--alert-ink)');}return;}
+ if(cur&&cur.id===id){lxPollUnknown=0;lxStat('⟳ '+(cur.progress?.phase_label||cur.status||'running')+'\nElapsed: '+el+'s','var(--accent3)');}
+ else if(inQ){lxPollUnknown=0;lxStat('⟳ queued\nElapsed: '+el+'s','var(--accent3)');}
+ else{lxPollUnknown++;if(lxPollUnknown>20){lxPollStop('⚠ job not found after 20 polls — tracking stopped (it may still be running server-side).');return;}lxStat('⟳ polling…\nElapsed: '+el+'s','var(--accent3)');}
+ }catch(e){lxPollUnknown++;if(lxPollUnknown>20){lxPollStop('⚠ /status unreachable — tracking stopped (the job continues server-side).');return;}lxStat('⚠ /status : '+e.message+'\n(the job continues server-side)','var(--accent3)');}}
+// Promisified poll for chaining: resolves when the job is done, rejects otherwise.
+async function lxWaitDone(id,onTick){const t0=performance.now();let unknown=0;
+ for(;;){await new Promise(r=>setTimeout(r,5000));
+  if(lxChainAbort)throw new Error('chain cancelled');
+  if(performance.now()-t0>4*3600*1000)throw new Error('4 h timeout on a segment');
+  let data;try{data=await (await fetch(base()+'/status',{headers:H})).json();}catch(_){unknown++;if(unknown>20)throw new Error('/status unreachable (20 failures)');continue;}
+  const inH=(data.history||[]).find(j=>j.id===id);
+  if(inH){if(['done','completed'].includes(inH.status))return inH;throw new Error(inH.status+(inH.error?' · '+inH.error:''));}
+  const cur=data.current,inQ=(data.queue||[]).find(j=>j.id===id);
+  if(cur&&cur.id===id){unknown=0;if(onTick)onTick(cur.progress?.phase_label||cur.status||'running',(performance.now()-t0)/1000);}
+  else if(inQ){unknown=0;if(onTick)onTick('queued',(performance.now()-t0)/1000);}
+  else{unknown++;if(unknown>20)throw new Error('job not found (20 polls)');}
+ }}
+// 📽 Long mode: one t2v then N-1 extends of 121 f — each segment stays <=35 M
+// pixel-frames (zero thrashing). The backend extends its last output by default.
+let lxChainAbort=false;
+function lxChainCancelShow(b){document.getElementById('lxChainCancel').style.display=b?'block':'none';}
+async function lxRunChain(){const go=document.getElementById('lxGo');const prompt=document.getElementById('lxPrompt').value.trim();
+ if(!prompt){lxStat('Write a prompt.','var(--alert-ink)');return;}
+ const sec=+document.getElementById('lxLongSec').value||20,nSeg=Math.max(1,Math.round(sec/5));
+ const W=Math.min(704,+document.getElementById('lxW').value||704),Hh=Math.min(416,+document.getElementById('lxH').value||416);
+ lxChainAbort=false;go.disabled=true;lxChainCancelShow(true);
+ try{
+  for(let i=0;i<nSeg;i++){
+   if(lxChainAbort)throw new Error('chain cancelled');
+   const segLbl=`segment ${i+1}/${nSeg} · ~${Math.min(sec,(i+1)*5)} s / ${nSeg*5} s`;
+   const p={mode:i===0?'t2v':'extend',prompt,width:W,height:Hh,frames:121,quality:document.getElementById('lxQ').value,seed:-1};
+   fetch(base()+'/llm/sleep',{method:'POST',headers:H}).catch(()=>{});
+   lxStat('⟳ '+segLbl+' · sending…','var(--accent3)');
+   const r=await fetch(base()+'/queue/add',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',...H},body:new URLSearchParams(p)});
+   const d=await r.json().catch(()=>null);if(!d)throw new Error('non-JSON response (HTTP '+r.status+') — stale proxy?');if(!r.ok||!d.ok||!d.id)throw new Error(d.error||('HTTP '+r.status));
+   await lxWaitDone(d.id,(phase,el)=>lxStat(`⟳ ${segLbl}\n${phase} · ${el.toFixed(0)}s`,'var(--accent3)'));
+  }
+  lxStat(`✓ chain finished: ${nSeg} segment${nSeg>1?'s':''} ~${nSeg*5} s — the final video is the last output.`,'var(--ok-ink)');lxShowLatest();
+ }catch(e){lxStat('✗ chain: '+e.message,'var(--alert-ink)');}
+ finally{go.disabled=false;go.removeAttribute('aria-busy');lxChainCancelShow(false);}}
+document.getElementById('lxChainCancel').addEventListener('click',()=>{lxChainAbort=true;
+ fetch(base()+'/stop',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',...H},body:new URLSearchParams({})}).catch(()=>{});
+ lxStat('✕ chain cancellation requested…','#ffaa00');});
+async function lxSubmit(){const go=document.getElementById('lxGo');const prompt=document.getElementById('lxPrompt').value.trim();
+ if(lxMode==='long')return lxRunChain();
+ const W=+document.getElementById('lxW').value,Hh=+document.getElementById('lxH').value;
+ // 16 GB guardrail: when red, ask for explicit confirmation before enqueueing.
+ const bud=lxBudgetCalc(+document.getElementById('lxF').value||0,W,Hh);
+ if(bud.level==='bad'&&!confirm(`⛔ This job is ${bud.mpf.toFixed(0)} M pixel-frames (${bud.ratio.toFixed(1)}x the 16 GB budget).\nThrashing near certain: ~${bud.estMin} min of rendering, Mac unusable meanwhile.\n\n📽 Long mode would reach the same duration WITHOUT saturating the RAM.\n\nStart anyway?`))return;
+ const p={mode:lxMode,prompt,width:W,height:Hh,frames:document.getElementById('lxF').value,quality:document.getElementById('lxQ').value,seed:document.getElementById('lxSeed').value};
+ try{
+  if(lxMode==='keyframe'){const sf=document.getElementById('lxKfStart').files[0];if(!sf){lxStat('Frame-to-frame: pick at least the start frame.','var(--alert-ink)');return;}go.disabled=true;lxStat('Upload frame(s)…','var(--accent3)');p.image=await lxUpload(await lxResize(sf,W,Hh,lxKfTf.start),'kf_start.jpg');const ef=document.getElementById('lxKfEnd').files[0];if(ef){const ep=await lxUpload(await lxResize(ef,W,Hh,lxKfTf.end),'kf_end.jpg');p.image_end=ep;p.last_frame=ep;p.end_image=ep;}}
+  else if(lxMode==='extend'){const src=document.getElementById('lxSrc').value;if(src){p.source=src;p.video=src;p.image=src;}go.disabled=true;}
+  else{if(!prompt){lxStat('Write a prompt.','var(--alert-ink)');return;}go.disabled=true;}
+  lxStat('Sending…','var(--accent3)');
+  fetch(base()+'/llm/sleep',{method:'POST',headers:H}).catch(()=>{}); // frees the LLM RAM before the render (best-effort)
+  const r=await fetch(base()+'/queue/add',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',...H},body:new URLSearchParams(p)});
+  const d=await r.json().catch(()=>null);if(!d)throw new Error('non-JSON response (HTTP '+r.status+') — stale proxy?');if(!r.ok||!d.ok||!d.id)throw new Error(d.error||('HTTP '+r.status));
+  lxPollUnknown=0;lxStat('✓ enqueue · '+d.id+'\nPolling /status…','var(--ok-ink)');const t0=performance.now();lxPollT=setInterval(()=>lxPoll(d.id,t0),5000);lxPoll(d.id,t0);
+ }catch(e){lxStat('✗ '+e.message,'var(--alert-ink)');go.disabled=false;go.removeAttribute('aria-busy');}}
+function initLtx(){lxSetMode(lxMode);lxSrcList();fetch(base()+'/status',{headers:H}).then(r=>{document.getElementById('dLtx').style.background=r.ok?'#66f0b8':'#ff5050';}).catch(()=>{document.getElementById('dLtx').style.background='#ff5050';});document.getElementById('lxPrompt').focus();}
+document.querySelectorAll('.ltxmode').forEach(b=>b.addEventListener('click',()=>lxSetMode(b.dataset.m)));
+document.getElementById('lxGo').addEventListener('click',lxSubmit);
+document.getElementById('lxReload').addEventListener('click',lxShowLatest);
+// ---------- Global volume (slider + localStorage, propagated to iframes) ----------
+function applyVolEverywhere(){document.querySelectorAll('video').forEach(v=>v.volume=VOL);
+ // the gallery videos live in an iframe (another document) -> postMessage
+ document.querySelectorAll('iframe').forEach(f=>{try{f.contentWindow.postMessage({type:'set-volume',vol:VOL},'*');}catch(_){}});}
+(function(){const sl=document.getElementById('volSlider');if(!sl)return;sl.value=VOL;
+ sl.addEventListener('input',e=>{VOL=+e.target.value;SS.set('phos_volume',VOL);applyVolEverywhere();});
+// ---------- Theme (dark by default, follows the OS on first visit) ----------
+// The sub-pages live in iframes: the shell owns the choice and pushes it down,
+// the same way the volume travels, so a switch is instant everywhere.
+function currentTheme(){return document.documentElement.getAttribute('data-theme')==='light'?'light':'dark';}
+/* WebKit does not always re-resolve a custom property used in background-color
+   when the property changes on :root — the token swaps, the painted colour does
+   not, and a live switch leaves chips and buttons on the other theme's surface.
+   Forcing a reflow is not enough; taking the body out of the render tree and
+   putting it back in the same synchronous block is, and nothing paints in
+   between, so there is no flash. Only on an actual switch: a page loaded in
+   either theme is already correct, because the choice is applied pre-paint. */
+function repaintForThemeSwap(){
+ const b=document.body,prev=b.style.display;
+ b.style.display='none';
+ void b.offsetHeight;
+ b.style.display=prev;
+}
+function applyTheme(mode,{live=false}={}){
+ if(mode==='light')document.documentElement.setAttribute('data-theme','light');
+ else document.documentElement.removeAttribute('data-theme');
+ if(live)repaintForThemeSwap();
+ SS.set('phos_theme',mode);
+ const b=document.getElementById('themeBtn');
+ if(b){b.innerHTML=ico(mode==='light'?'sun':'moon');
+  b.title=mode==='light'?'Switch to the dark theme':'Switch to the light theme';}
+ const meta=document.querySelector('meta[name=theme-color]');
+ if(meta)meta.setAttribute('content',mode==='light'?'#f7f4fd':'#05010f');
+ document.querySelectorAll('iframe').forEach(f=>{try{f.contentWindow.postMessage({type:'set-theme',theme:mode},'*');}catch(_){}});
+}
+(function(){
+ const b=document.getElementById('themeBtn');
+ applyTheme(currentTheme());
+ if(b)b.addEventListener('click',()=>applyTheme(currentTheme()==='light'?'dark':'light',{live:true}));
+ // An iframe that loads after a switch has to be told too.
+ document.querySelectorAll('iframe').forEach(f=>f.addEventListener('load',()=>{
+  try{f.contentWindow.postMessage({type:'set-theme',theme:currentTheme()},'*');}catch(_){}}));
+})();
+ // Iframes loaded AFTER a change receive the volume on their load event —
+ // essential in the host-html sandbox where the gallery cannot read localStorage.
+ document.querySelectorAll('iframe').forEach(f=>f.addEventListener('load',()=>{try{f.contentWindow.postMessage({type:'set-volume',vol:VOL},'*');}catch(_){}}));})();
+
+// ---------- Render-host monitor (side panel: running job + RAM + disk) ----------
+let monTimer=null;
+async function monRefresh(){const b=document.getElementById('monBody');if(!b)return;
+ try{const [h,s]=await Promise.all([fetch(base()+'/health',{headers:H}).then(r=>r.json()).catch(()=>({})),fetch(base()+'/status',{headers:H}).then(r=>r.json()).catch(()=>({}))]);
+  const sy=h.system||{};const cur=s.current,q=s.queue||[];
+  let html='';
+  if(sy.ram_total_gb){const pct=sy.ram_pct||0;html+=`<div style="opacity:.7;text-transform:uppercase;font-size:var(--fs-2xs);letter-spacing:.06em">RAM ${sy.ram_used_gb}/${sy.ram_total_gb} Go · ${pct}%</div><div class="mraq"><i style="width:${pct}%;background:${pct>90?'#ff5050':pct>75?'#ffaa00':'linear-gradient(90deg,var(--accent2),var(--accent))'}"></i></div>`;}
+  if(sy.disk_free_gb!=null)html+=`<div style="opacity:.7;font-size:var(--fs-2xs);margin-bottom:8px">Free disk: ${sy.disk_free_gb} GB / ${sy.disk_total_gb||'?'} GB</div>`;
+  html+=`<div style="opacity:.7;text-transform:uppercase;font-size:var(--fs-2xs);letter-spacing:.06em;margin-top:4px">Render</div>`;
+  if(cur){const p=cur.progress||{};const lbl=(cur.params&&(cur.params.label||cur.params.prompt))||cur.id||'';
+   html+=`<div style="display:flex;align-items:center;gap:8px;margin:2px 0"><span style="color:var(--accent3);font-size:var(--fs-xs);flex:1 1 auto">⟳ ${p.phase_label||cur.status||'running'}${typeof p.pct==='number'?' · '+Math.round(p.pct)+'%':''}</span><button class="mon-x" data-stop="1" title="Stop the running render">⏹ Stop</button></div>`;
+   if(lbl)html+=`<div style="opacity:.55;font-size:var(--fs-2xs);margin:0 0 4px;word-break:break-all">${esc(String(lbl).slice(0,90))}</div>`;}
+  else html+='<div style="opacity:.5;font-size:var(--fs-xs);margin:2px 0">no render in progress</div>';
+  if(q.length){html+=`<div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span style="opacity:.7;text-transform:uppercase;font-size:var(--fs-2xs);letter-spacing:.06em;flex:1 1 auto">File · ${q.length}</span>${q.length>1?'<button class="mon-x" data-clear="1" title="Clear the whole queue">clear</button>':''}</div>`;
+   q.slice(0,6).forEach(j=>{const lbl=(j.params&&(j.params.label||j.params.prompt))||j.id||'job';
+    html+=`<div style="display:flex;align-items:center;gap:4px;font-size:var(--fs-2xs);opacity:.85;margin:2px 0"><span style="flex:1 1 auto;word-break:break-all">${esc(String(lbl).slice(0,60))}</span><button class="mon-x" data-cancel="${esc(j.id||'')}" title="Cancel this job">✕</button></div>`;});
+   if(q.length>6)html+=`<div style="opacity:.5;font-size:var(--fs-2xs)">… +${q.length-6} autres</div>`;}
+  html+=`<div style="opacity:.5;font-size:var(--fs-2xs);margin-top:12px">proxy ${h.version||'?'} · maj ${new Date().toLocaleTimeString()}</div>`;
+  b.innerHTML=html;
+ }catch(e){b.innerHTML='<div style="color:var(--alert-ink);font-size:var(--fs-xs)">✗ monitor unreachable</div>';}}
+// Monitor actions: ⏹ Stop (running render), ✕ (queued job), clear — same
+// contract as the gallery: POST /stop · /queue/remove {id} · /queue/clear.
+document.getElementById('monBody').addEventListener('click',async e=>{
+ const stop=e.target.closest('[data-stop]'),cancel=e.target.closest('[data-cancel]'),clear=e.target.closest('[data-clear]');
+ if(!stop&&!cancel&&!clear)return;
+ const post=(p,f)=>fetch(base()+p,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',...H},body:new URLSearchParams(f||{})});
+ try{
+  if(stop){if(!confirm('Stop the running render ?'))return;stop.disabled=true;stop.textContent='…';await post('/stop');}
+  else if(cancel){cancel.disabled=true;cancel.textContent='…';await post('/queue/remove',{id:cancel.dataset.cancel});}
+  else if(clear){if(!confirm('Clear the whole queue d\'attente ?'))return;clear.disabled=true;await post('/queue/clear');}
+ }catch(_){/* the refresh will restore the real state */}
+ setTimeout(monRefresh,600);});
+function monOpen(){const p=document.getElementById('monPanel');p.classList.add('open');monRefresh();if(monTimer)clearInterval(monTimer);monTimer=setInterval(monRefresh,4000);}
+function monCloseFn(){document.getElementById('monPanel').classList.remove('open');if(monTimer){clearInterval(monTimer);monTimer=null;}}
+document.getElementById('ramBadge').addEventListener('click',monOpen);
+document.getElementById('monClose').addEventListener('click',monCloseFn);
+
+// ---------- Help modal ----------
+function helpOpen(){document.getElementById('helpModal').classList.add('show');}
+function helpCloseFn(){document.getElementById('helpModal').classList.remove('show');}
+document.getElementById('helpBtn').addEventListener('click',helpOpen);
+document.getElementById('helpClose').addEventListener('click',helpCloseFn);
+document.getElementById('helpModal').addEventListener('click',e=>{if(e.target.id==='helpModal')helpCloseFn();});
+
+// ---------- Keyboard shortcuts ----------
+const TAB_ORDER=['generator','storyboard','gallery','images','ltx','dash','plists','doc'];
+document.addEventListener('keydown',e=>{
+ const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+ if(e.key==='Escape'){helpCloseFn();monCloseFn();if(window.Gal)Gal.close();if(window.FS)FS.close();if(window.PL)PL.closePick();return;}
+ if((e.ctrlKey||e.metaKey)&&e.key>='1'&&e.key<='9'){e.preventDefault();const v=TAB_ORDER[+e.key-1];const t=document.querySelector(`.tab[data-v="${v}"]`);if(t)t.click();return;}
+ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();const lx=document.getElementById('ltx');if(lx&&lx.classList.contains('active'))document.getElementById('lxGo').click();else if(document.getElementById('imggen').classList.contains('active'))document.getElementById('igGo').click();return;}
+ if(!typing&&window.Gal&&document.getElementById('lbOvl').classList.contains('show')){if(e.key==='ArrowLeft'){Gal.nav(-1);return;}if(e.key==='ArrowRight'){Gal.nav(1);return;}}
+ if(typing)return;
+ if(e.key==='?'){helpOpen();}
+ else if(e.key==='m'){const p=document.getElementById('monPanel');p.classList.contains('open')?monCloseFn():monOpen();}
+ else if(e.key==='v'||e.key==='V'){if(window.Voice)Voice.hotkey();}
+});
+
+// ---------- Render timeline (dashboard) — last 14 days ----------
+async function renderTimeline(pre){const host=document.getElementById('dTimeline');if(!host)return;
+ try{const outs=pre||await Outputs.get(false);
+  const now=Date.now(),day=864e5,N=14,buckets=new Array(N).fill(0);
+  outs.forEach(o=>{const t=o.ts||outTs(o);if(!t)return;const age=Math.floor((now-t)/day);if(age>=0&&age<N)buckets[N-1-age]++;});
+  const max=Math.max(1,...buckets);
+  const lbl=i=>{if(i===N-1)return 'today';if(i===N-2)return 'yest.';const d=new Date(now-(N-1-i)*day);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
+  host.innerHTML=`<div class="tl2"><div style="font-size:var(--fs-2xs);opacity:.6;text-transform:uppercase;letter-spacing:.08em">Renders · 14 days <span style="opacity:.7">(${outs.length} outputs in total)</span></div>
+   <div class="tlrow">${buckets.map((n,i)=>`<div class="tlb" style="height:${Math.max(5,n/max*100)}%${n?'':';opacity:.22'}" title="${lbl(i)}: ${n} render${n>1?'s':''}"></div>`).join('')}
+   </div><div class="tll">${buckets.map((n,i)=>`<span>${i%2?lbl(i):''}</span>`).join('')}</div></div>`;
+ }catch(_){host.innerHTML='';}}
+
+// ---------- Extend a video in LTX (native gallery, dashboard, playlists, postMessage) ----------
+function ltxExtendFrom(path,name){showTab('ltx');
+ setTimeout(()=>{lxSetMode('extend');const sel=document.getElementById('lxSrc');if(sel&&path){let opt=[...sel.options].find(o=>o.value===path);if(!opt){opt=document.createElement('option');opt.value=path;opt.textContent=name||path;sel.appendChild(opt);}sel.value=path;}lxStat('✓ source: '+(name||path)+' — describe how the motion CONTINUES then hit ✦ Start.','var(--ok-ink)');},250);}
+window.addEventListener('message',e=>{const d=e.data;if(!d||d.type!=='ltx-extend')return;ltxExtendFrom(d.path,d.name);});
+
+(async()=>{await resolveBackend();document.getElementById('f-generator').src=pageURL('generator');health();dtHealth();
+ setInterval(health,8000);   // /health is the proxy's own route: it answers even when the render backend is gone
+ // Draw Things is a separate app and 502s when it is closed: back off from 8s
+ // to 40s after three failures rather than filling the console with them.
+ (function beat(){setTimeout(()=>{dtHealth().then(beat,beat);},dtDown>2?40000:8000);})();
+ // Top 10 on open (light: no sidecars) — the full dashboard loads with its tab.
+ try{const outs=await Outputs.get(true);
+  renderTop10(outs.filter(o=>o.kind==='video').slice(0,120).map(o=>({o,m:metrics(o)})));
+ }catch(_){renderTop10([]);}
+})();
+</script>
+<script>
+/* ═══════════════════════════════ MODULE V4 ═══════════════════════════════
+   Voice (Handy-style dictation) · native Gallery · Frame Studio · Playlists ·
+   LTX doc + prompting tutor. Builds on the globals from script 1
+   (base/H/esc/metrics/Outputs/outPrompt/lxSetMode/toI2VBlob/showTab/…).   */
+'use strict';
+// ── helpers ──
+function toast(msg,type,ms){const box=document.getElementById('toasts');if(!box)return;
+ const t=document.createElement('div');t.className='toast '+(type||'info');t.textContent=msg;box.appendChild(t);
+ setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),320);},ms||3800);}
+function fmtSize(n){if(!n)return '';return n>1048576?(n/1048576).toFixed(1)+' MB':Math.round(n/1024)+' KB';}
+function fmtAgo(ts){if(!ts)return '—';const s=(Date.now()-ts)/1000;
+ if(s<90)return "just now";if(s<3600)return Math.round(s/60)+' min';if(s<86400)return Math.round(s/3600)+' h';
+ if(s<7*86400)return Math.round(s/86400)+' d';return new Date(ts).toLocaleDateString('en-GB');}
+// Proxy LLM routes (shared contract: POST {prompt} -> {prompt}).
+async function llmRoute(route,text){
+ const r=await fetch(base()+route,{method:'POST',headers:{'Content-Type':'application/json',...H},body:JSON.stringify({prompt:text})});
+ const d=await r.json().catch(()=>null);
+ if(!d)throw new Error('non-JSON response (HTTP '+r.status+') — stale proxy?');
+ if(!r.ok||!d.prompt)throw new Error(d.error||('HTTP '+r.status));
+ return d.prompt;}
+// ── Characters: served by the active style pack (GET /characters).
+// The engine ships no character: with no pack the list stays empty and the
+// matching selectors render empty.
+let CHARS=[];
+let LORA_TRIGGER='';  // LoRA trigger, supplied by the pack
+fetch(base()+'/characters').then(r=>r.ok?r.json():null).then(d=>{
+ if(d&&d.trigger)LORA_TRIGGER=d.trigger;
+ if(d&&Array.isArray(d.characters)&&d.characters.length)CHARS=d.characters.map(c=>({id:c.id,canonical:c.canonical,visual:c.visual}));}).catch(()=>{});
+function charMatch(o){const hay=((o.name||'')+' '+(o.prompt||'')).toLowerCase();
+ return CHARS.filter(c=>hay.includes(c.canonical.toLowerCase())||hay.includes(c.id.toLowerCase()));}
+
+/* ══════════════ VOICE — Handy-style dictation (Web Speech API) ══════════════ */
+const Voice=(()=>{
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ let lang=SS.get('phos_voice_lang')||'fr-FR';
+ let rec=null,curBtn=null,curEl=null,baseVal='';
+ const langLabel=()=>lang.startsWith('fr')?'FR':'EN';
+ function syncLangUi(){document.querySelectorAll('.miclang').forEach(b=>b.textContent=langLabel());
+  const t=document.getElementById('micLangTop');if(t)t.innerHTML=ico('mic')+' '+esc(langLabel());}
+ function toggleLang(){lang=lang.startsWith('fr')?'en-US':'fr-FR';SS.set('phos_voice_lang',lang);syncLangUi();
+  toast('Dictation: '+(lang.startsWith('fr')?'French':'English'),'info',1800);}
+ function stop(){if(rec){try{rec.stop()}catch(_){}}}
+ function cleanup(){if(curBtn)curBtn.classList.remove('rec');rec=null;curBtn=null;curEl=null;}
+ function start(el,btn){
+  if(!SR){toast("Dictation unavailable: this browser does not expose SpeechRecognition (Safari >=14.1 or Chrome, over HTTPS/localhost).",'err',6000);return;}
+  if(rec){const same=curEl===el;stop();if(same)return;}
+  const r=new SR();rec=r;curEl=el;curBtn=btn||null;baseVal=el.value?el.value.replace(/\s+$/,'')+' ':'';
+  r.lang=lang;r.continuous=true;r.interimResults=true;
+  let finals='';
+  r.onresult=ev=>{let interim='';
+   for(let i=ev.resultIndex;i<ev.results.length;i++){const res=ev.results[i];
+    if(res.isFinal)finals+=res[0].transcript+' ';else interim+=res[0].transcript;}
+   el.value=(baseVal+finals+interim).replace(/  +/g,' ');el.dispatchEvent(new Event('input',{bubbles:true}));};
+  r.onerror=ev=>{if(ev.error==='not-allowed')toast('Microphone refused — allow the microphone for this site.','err',5000);
+   else if(ev.error!=='aborted'&&ev.error!=='no-speech')toast('Dictation: '+ev.error,'warn');cleanup();};
+  r.onend=()=>cleanup();
+  try{r.start();if(btn)btn.classList.add('rec');el.focus();
+   toast('Speak ('+langLabel()+') — click the mic again or press V to stop.','info',2600);}
+  catch(e){cleanup();toast('Dictation: '+e.message,'err');}}
+ // Overlay a dictation button and a language pill on top of a field.
+ function attach(el,opts){opts=opts||{};if(!el||el.dataset.mic)return;el.dataset.mic='1';
+  let wrap=el.closest('.micwrap');
+  if(!wrap){wrap=document.createElement('div');wrap.className='micwrap';el.parentNode.insertBefore(wrap,el);wrap.appendChild(el);}
+  const lb=document.createElement('button');lb.type='button';lb.className='miclang';lb.title='Dictation language (FR/EN)';lb.textContent=langLabel();
+  lb.addEventListener('click',ev=>{ev.preventDefault();toggleLang();});
+  const b=document.createElement('button');b.type='button';b.className='mic';b.title=opts.title||'Voice dictation (V)';
+  b.innerHTML='<svg class="ico" aria-hidden="true"><use href="#i-mic"/></svg>';
+  b.addEventListener('click',ev=>{ev.preventDefault();start(el,b);});
+  wrap.appendChild(lb);wrap.appendChild(b);
+  if(el.tagName==='TEXTAREA')el.style.paddingRight='46px';
+  else if(el.tagName==='INPUT')el.style.paddingRight='80px';}
+ // V key: dictate into the active tab's main prompt.
+ const HOT={ltx:'lxPrompt',imggen:'igPrompt',doc:'tutIdea',gal:'gSearch'};
+ function hotkey(){for(const k in HOT){const v=document.getElementById(k);
+   if(v&&v.classList.contains('active')){const el=document.getElementById(HOT[k]);
+    if(el){const w=el.closest('.micwrap');start(el,w?w.querySelector('.mic'):null);return;}}}
+  toast('Open LTX, Images, Gallery or Doc to dictate with V.','info',2600);}
+ syncLangUi();
+ return{attach,start,stop,toggleLang,hotkey,supported:!!SR};
+})();
+
+/* ══════════════ GALERIE NATIVE + LECTEUR (lightbox) ══════════════ */
+const Gal=(()=>{
+ const $=id=>document.getElementById(id);
+ let q='',filter='all',sort='date',inited=false,list=[],selMode=false;const selSet=new Map();
+ let lbQueue=[],lbIdx=-1,lbUrl=null,lbAuto=false,lbLoop=false,lbShuffle=false;
+ function segOn(id,b){document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.toggle('on',x===b));}
+ async function init(force){if(!inited){wire();inited=true;}await render(!!force);}
+ function wire(){Voice.attach($('gSearch'),{title:'Recherche vocale'});
+  $('gSearch').addEventListener('input',e=>{q=e.target.value;render(false);});
+  $('gFilter').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;filter=b.dataset.f;segOn('gFilter',b);render(false);});
+  $('gSort').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;sort=b.dataset.s;segOn('gSort',b);render(false);});
+  $('gReload').addEventListener('click',()=>render(true));
+  $('gSelMode').addEventListener('click',()=>{selMode=!selMode;
+   if(!selMode){selSet.clear();document.querySelectorAll('.gcard.gsel').forEach(c=>c.classList.remove('gsel'));}
+   $('gSelMode').classList.toggle('on',selMode);$('gGrid').classList.toggle('selmode',selMode);selUI();});
+  $('gSelAdd').addEventListener('click',()=>{if(selSet.size)PL.pickMany([...selSet.values()]);
+   else toast('Click thumbnails to select them','info',2200);});
+  $('lbClose').addEventListener('click',close);
+  $('lbPrev').addEventListener('click',()=>nav(-1));
+  $('lbNext').addEventListener('click',()=>nav(1));
+  $('lbOvl').addEventListener('click',e=>{if(e.target.id==='lbOvl')close();});}
+ function selUI(){const b=$('gSelAdd');b.style.display=selMode?'':'none';b.textContent='➕ Playlist ('+selSet.size+')';}
+ function toggleSel(o,card){if(!o.path)return;
+  if(selSet.has(o.path)){selSet.delete(o.path);card.classList.remove('gsel');}
+  else{selSet.set(o.path,o);card.classList.add('gsel');}selUI();}
+ async function render(force){const g=$('gGrid'),e=$('gEmpty'),c=$('gCount');
+  if(force||!Outputs.data)g.innerHTML='<div class="sk" style="height:150px;grid-column:1/-1"></div>';
+  let outs=[];try{outs=await Outputs.get(force)}
+  catch(_){g.innerHTML='<div class="empty">✗ /outputs unreachable (is the proxy running?)</div>';c.textContent='—';return;}
+  await Promise.all(outs.filter(o=>o.kind==='video'&&o.has_sidecar&&!o.prompt).slice(0,80).map(o=>outPrompt(o).catch(()=>{})));
+  const week=Date.now()-7*864e5;
+  list=outs.filter(o=>filter==='all'?true:(filter==='week'?o.ts>=week:o.kind===filter));
+  const qq=q.trim().toLowerCase();
+  if(qq)list=list.filter(o=>((o.name||'')+' '+(o.prompt||'')).toLowerCase().includes(qq)
+    ||charMatch(o).some(ch=>ch.canonical.toLowerCase().includes(qq)));
+  const px=o=>o.kind==='video'?metrics(o).px:-1;
+  if(sort==='name')list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  else{const key={date:o=>o.ts,budget:px,size:o=>o.size||0}[sort]||(o=>o.ts);list.sort((a,b)=>key(b)-key(a));}
+  c.textContent=list.length+' / '+outs.length;
+  e.style.display=list.length?'none':'block';g.innerHTML='';
+  const frag=document.createDocumentFragment();
+  list.forEach(o=>{const card=document.createElement('div');card.className='card gcard';
+   // The tile badge carries the pixel-frame budget — the one number that
+   // decides whether a re-render will take 12 s or 104 s per step.
+   const isV=o.kind==='video',m=isV?metrics(o):null,chars=charMatch(o);
+   const lvl=(m&&m.px)?budgetLevel(m.px,m.mode):null;
+   card.innerHTML=`<div class="gthumb"><img loading="lazy" alt="" src="${isV?base()+'/thumb?path='+encodeURIComponent(o.path||''):base()+o.url}" onerror="this.outerHTML='<div class=gph>'+(${isV}?ico('film','ico-lg'):ico('image','ico-lg'))+'</div>'">
+    ${lvl?`<span class="gbadge${lvl==='bad'?' highlight':''}" title="${BUDGET_WORD[lvl]} — ${Math.round(m.px)} M pixel-frames"><span class="dot ${lvl}"></span> ${Math.round(m.px)} M</span>`:''}<span class="gkind">${isV?ico('film'):ico('image')}</span>
+    <div class="gover">${isV?'<button data-a="frame" title="extract a frame (the last one by default)"><svg class="ico" aria-hidden="true"><use href="#i-image"/></svg></button><button data-a="extend" title="extend in LTX">⏩</button>':'<button data-a="i2v" title="send to the Generator i2v"><svg class="ico" aria-hidden="true"><use href="#i-bolt"/></svg></button>'}<button data-a="pl" title="add to a playlist"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button><button data-a="dl" title="download"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg></button></div></div>
+   <div class="gmeta"><div class="gname">${esc(o.name)}</div><div class="gsub">${fmtAgo(o.ts)}${o.size?' · '+fmtSize(o.size):''}${chars.length?' · '+chars.map(ch=>esc(ch.canonical)).join(', '):''}</div></div>`;
+   if(selSet.has(o.path))card.classList.add('gsel');
+   card.addEventListener('click',ev=>{const b=ev.target.closest('button');
+    if(!b){if(selMode){toggleSel(o,card);return;}open(o,list);return;}
+    const a=b.dataset.a;
+    if(a==='frame')FS.open(o);
+    else if(a==='extend')ltxExtendFrom(o.path,o.name);
+    else if(a==='i2v')toI2VFromUrl(base()+o.url,o.name);
+    else if(a==='pl')PL.pick(o);
+    else if(a==='dl')download(o);});
+   frag.appendChild(card);});
+  g.appendChild(frag);}
+ async function download(o){try{toast('⬇ downloading…','info',1500);
+  const blob=await (await fetch(base()+o.url,{headers:H})).blob();dlBlob(blob,o.name);}
+  catch(e){toast('✗ '+e.message,'err');}}
+ // ── player (gallery + dashboard + playlists) ──
+ function open(o,queue,opts){opts=opts||{};
+  lbQueue=(queue&&queue.length)?queue.slice():[o];
+  lbIdx=Math.max(0,lbQueue.findIndex(x=>x.path===o.path&&x.name===o.name));
+  lbAuto=!!opts.auto;lbLoop=!!opts.loop;lbShuffle=!!opts.shuffle;
+  $('lbOvl').classList.add('show');show();}
+ function close(){$('lbOvl').classList.remove('show');$('lbMedia').innerHTML='';
+  if(lbUrl){URL.revokeObjectURL(lbUrl);lbUrl=null;}}
+ function nav(d){if(!lbQueue.length)return;
+  if(lbShuffle&&d===1)lbIdx=Math.floor(Math.random()*lbQueue.length);
+  else{lbIdx+=d;
+   if(lbIdx<0)lbIdx=lbQueue.length-1;
+   if(lbIdx>=lbQueue.length){if(lbLoop)lbIdx=0;else{lbIdx=lbQueue.length-1;toast('End of the playlist 🎧','info',2200);return;}}}
+  show();}
+ async function show(){const o=lbQueue[lbIdx];if(!o)return;const m=$('lbMedia');
+  $('lbTitle').textContent=o.name||'—';
+  $('lbQueue').textContent=lbQueue.length>1?(lbIdx+1)+' / '+lbQueue.length+(lbAuto?' · auto':'')+(lbShuffle?' · 🔀':'')+(lbLoop?' · 🔁':''):'';
+  $('lbPrev').style.display=$('lbNext').style.display=lbQueue.length>1?'block':'none';
+  m.innerHTML='<div class="sk" style="height:220px;border-radius:12px"></div>';
+  $('lbPrompt').style.display='none';
+  const acts=$('lbActions');acts.innerHTML='';
+  try{const blob=await (await fetch(base()+o.url,{headers:H})).blob();
+   if(lbUrl)URL.revokeObjectURL(lbUrl);lbUrl=URL.createObjectURL(blob);
+   m.innerHTML='';
+   if(o.kind==='video'){const v=document.createElement('video');v.controls=true;v.autoplay=true;v.volume=VOL;v.src=lbUrl;
+    // Nothing decodable behind the URL (replay mode ships no media files): say
+    // so, instead of leaving an unexplained black rectangle.
+    v.addEventListener('error',()=>{m.innerHTML=`<img class="lbimg" alt="" src="${base()}/thumb?path=${encodeURIComponent(o.path||'')}">`
+     +'<div class="empty" style="margin-top:8px">✗ Nothing to play — no media behind this entry (render host offline, or replay mode).</div>';});
+    v.addEventListener('ended',()=>{if(lbAuto)nav(1);});m.appendChild(v);}
+   else{const im=document.createElement('img');im.className='lbimg';im.src=lbUrl;m.appendChild(im);}
+   const mk=(txt,fn,title)=>{const b=document.createElement('button');b.className='load';b.style.width='auto';b.textContent=txt;
+    if(title)b.title=title;b.addEventListener('click',fn);acts.appendChild(b);};
+   if(o.kind==='video'){
+    mk('🖼 Last frame',()=>{close();FS.open(o);},'Frame Studio — the last frame is pre-selected');
+    mk('⏩ Extend in LTX',()=>{close();ltxExtendFrom(o.path,o.name);});}
+   else mk('⚡ → i2v',()=>toI2VFromUrl(base()+o.url,o.name));
+   mk('➕ Playlist',()=>PL.pick(o));
+   mk('⬇ Download',()=>dlBlob(blob,o.name));
+   const p=await outPrompt(o).catch(()=>'');
+   if(p){const pr=$('lbPrompt');pr.style.display='block';pr.textContent=p;
+    mk('Copy the prompt',()=>{if(navigator.clipboard)navigator.clipboard.writeText(p).then(()=>toast('Prompt copied','ok',1500)).catch(()=>{});});}
+  }catch(e){m.innerHTML='<div class="empty">✗ '+esc(e.message)+'</div>';}}
+ return{init,render,open,close,nav};
+})();
+
+/* ══════════════ FRAME STUDIO — extract a frame (the last one by default) ══════════════ */
+const FS=(()=>{
+ const $=id=>document.getElementById(id);
+ let o=null,url=null,dur=0,capBlob=null,capW=0,capH=0,wired=false;
+ const frameName=()=>((o&&o.name)?o.name.replace(/\.[a-z0-9]+$/i,''):'frame')+'_f'+($('fsVideo').currentTime||0).toFixed(2)+'s.png';
+ function seekTo(t){try{$('fsVideo').currentTime=t}catch(_){}}
+ function wire(){if(wired)return;wired=true;
+  const v=$('fsVideo'),rg=$('fsRange');
+  $('fsClose').addEventListener('click',close);
+  $('fsOvl').addEventListener('click',e=>{if(e.target.id==='fsOvl')close();});
+  v.addEventListener('loadedmetadata',()=>{dur=v.duration||0;rg.max=dur||100;seekTo(Math.max(0,dur-0.05));});
+  v.addEventListener('timeupdate',()=>{$('fsTime').textContent=(v.currentTime||0).toFixed(2)+' s / '+(dur||0).toFixed(2)+' s';rg.value=v.currentTime||0;});
+  rg.addEventListener('input',()=>{v.pause();v.currentTime=+rg.value;});
+  $('fsFirst').addEventListener('click',()=>seekTo(0));
+  $('fsLast').addEventListener('click',()=>seekTo(Math.max(0,dur-0.05)));
+  $('fsPrev').addEventListener('click',()=>seekTo(Math.max(0,v.currentTime-1/24)));
+  $('fsNext').addEventListener('click',()=>seekTo(Math.min(dur,v.currentTime+1/24)));
+  $('fsGrab').addEventListener('click',grab);
+  $('fsDl').addEventListener('click',()=>{if(capBlob)dlBlob(capBlob,frameName());});
+  $('fsSave').addEventListener('click',saveM4);
+  $('fsToI2V').addEventListener('click',()=>{if(!capBlob)return;const b=capBlob,n=frameName();close();toI2VBlob(b,n);});
+  $('fsToKf').addEventListener('click',toKeyframe);
+  $('fsToImg').addEventListener('click',toImg2Img);}
+ async function open(out){wire();o=out;capBlob=null;$('fsCap').style.display='none';
+  $('fsName').textContent=(o&&o.name)||'—';$('fsOvl').classList.add('show');
+  $('fsTime').textContent='loading the video…';
+  try{const blob=await (await fetch(base()+o.url,{headers:H})).blob();
+   if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(blob);
+   const v=$('fsVideo');v.src=url;v.pause();}
+  catch(e){$('fsTime').textContent='✗ '+e.message;toast('Frame Studio : '+e.message,'err');}}
+ function close(){$('fsOvl').classList.remove('show');const v=$('fsVideo');v.pause();v.removeAttribute('src');v.load();
+  if(url){URL.revokeObjectURL(url);url=null;}}
+ // Safari: drawImage(video) after a paused seek sometimes paints BLACK until
+ // the frame has been re-presented. We force a re-present (nudge currentTime +
+ // requestVideoFrameCallback/seeked) and redraw when the first draw comes out
+ // uniformly black.
+ function frameLooksBlack(cv){try{const m=document.createElement('canvas');m.width=32;m.height=18;
+  const c=m.getContext('2d');c.drawImage(cv,0,0,32,18);
+  const d=c.getImageData(0,0,32,18).data;let mx=0;
+  for(let i=0;i<d.length;i+=4){const l=d[i]+d[i+1]+d[i+2];if(l>mx)mx=l;}
+  return mx<24;}catch(_){return false;}}
+ function presentFrame(v){return new Promise(res=>{let done=false;const go=()=>{if(!done){done=true;res();}};
+  if(v.requestVideoFrameCallback){try{v.requestVideoFrameCallback(()=>go());}catch(_){}}
+  v.addEventListener('seeked',()=>setTimeout(go,30),{once:true});
+  setTimeout(go,450);
+  try{v.currentTime=Math.max(0,v.currentTime-0.0001);}catch(_){go();}});}
+ async function grab(){const v=$('fsVideo');
+  if(!v.videoWidth){toast('The video is not ready — wait for it to finish loading.','warn');return;}
+  const cv=$('fsCanvas');capW=cv.width=v.videoWidth;capH=cv.height=v.videoHeight;
+  const ctx=cv.getContext('2d');ctx.drawImage(v,0,0);
+  if(frameLooksBlack(cv)){await presentFrame(v);ctx.drawImage(v,0,0);
+   if(frameLooksBlack(cv)){await presentFrame(v);ctx.drawImage(v,0,0);
+    if(frameLooksBlack(cv))toast('Very dark frame (or a fade to black at the end of the clip) — step back 1-2 frames (-1f) and recapture.','warn',5000);}}
+  cv.toBlob(b=>{if(!b){toast('Capture failed (canvas)','err');return;}
+   capBlob=b;$('fsCap').style.display='flex';
+   const last=Math.abs(v.currentTime-(dur-0.05))<0.06;
+   $('fsCapInfo').textContent=`${capW}×${capH} · t = ${v.currentTime.toFixed(2)} s${last?' (last frame ✓)':''} · PNG ${fmtSize(b.size)}`;
+   toast('📸 Frame captured'+(last?' (last)':''),'ok',1800);},'image/png');}
+ async function saveM4(){if(!capBlob)return;
+  try{const fr=new FileReader();
+   const b64=await new Promise((res,rej)=>{fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=rej;fr.readAsDataURL(capBlob);});
+   const r=await fetch(base()+'/img-save',{method:'POST',headers:{'Content-Type':'application/json',...H},body:JSON.stringify({image:b64})});
+   if(!r.ok)throw new Error('HTTP '+r.status);
+   toast('💾 Frame saved into the render host images','ok');try{igLoadStored()}catch(_){}}
+  catch(e){toast('✗ /img-save : '+e.message,'err');}}
+ function toKeyframe(){if(!capBlob)return;
+  const f=new File([capBlob],frameName(),{type:'image/png'});
+  close();showTab('ltx');
+  setTimeout(()=>{lxSetMode('keyframe');
+   const inp=document.getElementById('lxKfStart');const dt=new DataTransfer();dt.items.add(f);inp.files=dt.files;
+   inp.dispatchEvent(new Event('change',{bubbles:true}));
+   lxStat('✓ frame loaded as the start frame — describe the motion then hit ✦ Start.','var(--ok-ink)');
+   toast('🎞 Start frame loaded (frame-to-frame)','ok');},250);}
+ async function toImg2Img(){if(!capBlob)return;
+  const fr=new FileReader();
+  const dataUrl=await new Promise((res,rej)=>{fr.onload=()=>res(String(fr.result));fr.onerror=rej;fr.readAsDataURL(capBlob);});
+  const w=capW,h=capH;close();showTab('images');
+  setTimeout(()=>{igInitB64=dataUrl.split(',')[1];
+   document.getElementById('igInitImg').src=dataUrl;document.getElementById('igInitPrev').style.display='block';
+   if(w)document.getElementById('igW').value=w;if(h)document.getElementById('igH').value=h;
+   document.getElementById('i2iWrap').open=true;
+   toast('🎨 Frame loaded as the img2img start image','ok');},250);}
+ return{open,close};
+})();
+/* ══════════════ PLAYLISTS — manuelles + auto (scores + personnages) ══════════════ */
+const PL=(()=>{
+ const $=id=>document.getElementById(id);
+ const KEY='phos_playlists_v1';
+ let sel=null,wired=false,pickO=null,pickM=null,items=[];
+ // One automatic playlist per measurable metric — the same figures the
+ // dashboard reads off the file and its sidecar. Nothing is scored or guessed.
+ const AUTO=[
+  {id:'week',icon:'sparkle',name:'This week',metric:'__week'},
+  {id:'longest',icon:'film',name:'Longest clips',metric:'seconds',fmt:v=>v.toFixed(1)+' s'},
+  {id:'heaviest',icon:'layers',name:'Heaviest renders',metric:'px',fmt:v=>Math.round(v)+' M px-f'},
+  {id:'slowest',icon:'refresh',name:'Slowest per step',metric:'sps',fmt:v=>v.toFixed(1)+' s/step',
+   none:'No render time was recorded for these clips, so seconds per step cannot be computed.'},
+  {id:'overbudget',icon:'flame',name:'Over budget',metric:'px',fmt:v=>Math.round(v)+' M px-f',
+   only:m=>m.px>BUDGET_WARN&&m.mode!=='long',
+   none:'Nothing past the budget — clips chained in Long mode are not counted, the budget is a per-pass limit.'}];
+ const load=()=>{try{const a=JSON.parse(SS.get(KEY)||'[]');return Array.isArray(a)?a:[]}catch(_){return[]}};
+ const save=ls=>SS.set(KEY,JSON.stringify(ls));
+ const uid=()=>'pl_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+ async function init(){if(!wired){wire();wired=true;}
+  if(!sel)sel={type:'auto',id:AUTO[0].id};
+  renderSide();await renderMain();}
+ function wire(){
+  $('plNew').addEventListener('click',()=>{const n=prompt('Name of the new playlist?','My playlist');if(!n)return;
+   const ls=load();const p={id:uid(),name:n.trim(),emoji:'🎬',items:[]};ls.push(p);save(ls);
+   sel={type:'user',id:p.id};renderSide();renderMain();});
+  $('plPlay').addEventListener('click',()=>{const ok=items.filter(x=>!x.__missing);
+   if(ok.length)Gal.open(ok[0],ok,{auto:true});else toast('Empty playlist','warn');});
+  $('plShuffle').addEventListener('click',()=>{const ok=items.filter(x=>!x.__missing);
+   if(ok.length)Gal.open(ok[Math.floor(Math.random()*ok.length)],ok,{auto:true,shuffle:true});});
+  $('plFreeze').addEventListener('click',()=>{if(!sel||sel.type==='user'||!items.length)return;
+   const ls=load();const meta=selMeta();
+   ls.push({id:uid(),name:(meta.name||'auto')+' · '+new Date().toLocaleDateString('en-GB'),emoji:'📌',
+    items:items.filter(o=>!o.__missing).map(o=>({path:o.path,name:o.name,url:o.url,kind:o.kind}))});
+   save(ls);toast('📌 Playlist pinned into "My playlists"','ok');renderSide();});
+  $('plRename').addEventListener('click',()=>{if(!sel||sel.type!=='user')return;
+   const ls=load();const p=ls.find(x=>x.id===sel.id);if(!p)return;
+   const n=prompt('New name:',p.name);if(!n)return;p.name=n.trim();save(ls);renderSide();renderMain();});
+  $('plDelete').addEventListener('click',()=>{if(!sel||sel.type!=='user')return;
+   const ls=load();const p=ls.find(x=>x.id===sel.id);if(!p)return;
+   if(!confirm('Delete the playlist "'+p.name+'"? (the videos stay on the render host)'))return;
+   save(ls.filter(x=>x.id!==sel.id));sel=null;renderSide();renderMain();});
+  wirePick();}
+ let pickWired=false;
+ // Also wired when the modal opens: the gallery's ➕ must work even if the
+ // Playlists tab has never been visited (pre-existing bug, fixed).
+ function wirePick(){if(pickWired)return;pickWired=true;
+  $('ppClose').addEventListener('click',closePick);
+  $('ppOvl').addEventListener('click',e=>{if(e.target.id==='ppOvl')closePick();});
+  $('ppCreate').addEventListener('click',()=>{const n=$('ppNew').value.trim();if(!n||(!pickO&&!pickM))return;
+   const src=pickM||[pickO];
+   const ls=load();ls.push({id:uid(),name:n,emoji:'🎬',items:src.map(o=>({path:o.path,name:o.name,url:o.url,kind:o.kind}))});
+   save(ls);$('ppNew').value='';toast('✓ « '+n+'" created, '+src.length+' video'+(src.length>1?'s':'')+' added'+(src.length>1?'s':''),'ok');renderPick();renderSide();});}
+ function selMeta(){if(!sel)return{};
+  if(sel.type==='auto')return AUTO.find(a=>a.id===sel.id)||{};
+  if(sel.type==='char'){const c=CHARS.find(c=>c.id===sel.id)||{};return{name:c.canonical,icon:'masks'};}
+  return load().find(x=>x.id===sel.id)||{};}
+ function rowHtml(icon,name,count,extra){
+  const glyph=icon&&icon.length<=3?`<span class="plemo">${icon}</span>`:ico(icon||'film','ico-lg');
+  return `${glyph}<span class="pln">${esc(name)}</span>${extra||''}<span class="plc">${count!=null?count:''}</span>`}
+ function renderSide(){
+  const au=$('plAutoList'),ch=$('plCharList'),us=$('plUserList'),ue=$('plUserEmpty');
+  au.innerHTML='';AUTO.forEach(a=>{const d=document.createElement('div');
+   d.className='plrow'+(sel&&sel.type==='auto'&&sel.id===a.id?' on':'');
+   d.innerHTML=rowHtml(a.icon,a.name,null,'<span class="plauto">auto</span>');
+   d.addEventListener('click',()=>{sel={type:'auto',id:a.id};renderSide();renderMain();});au.appendChild(d);});
+  ch.innerHTML='';
+  // A pack without a characters.json must not leave a headed, empty section.
+  ch.previousElementSibling.style.display=CHARS.length?'':'none';
+  CHARS.forEach(c=>{const d=document.createElement('div');
+   d.className='plrow'+(sel&&sel.type==='char'&&sel.id===c.id?' on':'');
+   d.innerHTML=rowHtml('masks',c.canonical,null,'<span class="plauto">auto</span>');
+   d.addEventListener('click',()=>{sel={type:'char',id:c.id};renderSide();renderMain();});ch.appendChild(d);});
+  const ls=load();us.innerHTML='';ue.style.display=ls.length?'none':'block';
+  ls.forEach(p=>{const d=document.createElement('div');
+   d.className='plrow'+(sel&&sel.type==='user'&&sel.id===p.id?' on':'');
+   d.innerHTML=rowHtml(p.emoji||'🎬',p.name,(p.items||[]).length);
+   d.addEventListener('click',()=>{sel={type:'user',id:p.id};renderSide();renderMain();});us.appendChild(d);});}
+ async function resolveItems(){if(!sel)return[];
+  let outs=[];try{outs=await Outputs.get(false)}catch(_){outs=Outputs.data||[]}
+  const vids=outs.filter(o=>o.kind==='video');
+  await Promise.all(vids.filter(o=>o.has_sidecar&&!o.prompt).slice(0,120).map(o=>outPrompt(o).catch(()=>{})));
+  if(sel.type==='auto'){const a=AUTO.find(x=>x.id===sel.id);if(!a)return[];
+   if(a.metric==='__week'){const wk=Date.now()-7*864e5;return vids.filter(o=>o.ts>=wk).sort((x,y)=>y.ts-x.ts);}
+   const scored=vids.map(o=>({o,m:metrics(o)}))
+    .filter(s=>!a.only||a.only(s.m))
+    .map(s=>({o:s.o,v:s.m[a.metric]||0}))
+    .filter(s=>s.v>0);
+   scored.sort((x,y)=>y.v-x.v);
+   return scored.slice(0,12).map(s=>{s.o.__v=s.v;return s.o;});}
+  if(sel.type==='char'){const c=CHARS.find(x=>x.id===sel.id);if(!c)return[];
+   return vids.filter(o=>charMatch(o).some(x=>x.id===c.id)).sort((x,y)=>y.ts-x.ts);}
+  const p=load().find(x=>x.id===sel.id);if(!p)return[];
+  return (p.items||[]).map(it=>{const live=outs.find(o=>o.path===it.path);
+   return live||Object.assign({__missing:true,ts:0,kind:it.kind||'video'},it);});}
+ async function renderMain(){
+  const box=$('plItems'),emp=$('plEmpty');
+  const isU=sel&&sel.type==='user',isA=sel&&sel.type!=='user';
+  $('plPlay').style.display=$('plShuffle').style.display=sel?'':'none';
+  $('plFreeze').style.display=isA?'':'none';
+  $('plRename').style.display=$('plDelete').style.display=isU?'':'none';
+  if(!sel){$('plTitle').textContent='Choose a playlist';$('plMeta').textContent='';box.innerHTML='';emp.style.display='block';
+   emp.textContent='← Pick an auto playlist or create your own.';return;}
+  const meta=selMeta();
+  $('plTitle').innerHTML=ico(meta.icon||'headphones')+' '+esc(meta.name||'—');
+  box.innerHTML='<div class="sk" style="height:64px"></div>';emp.style.display='none';
+  items=await resolveItems();
+  $('plMeta').textContent=items.length+' video'+(items.length>1?'s':'')
+   +(sel.type==='auto'?' · ranking recalculated live':'')
+   +(sel.type==='char'?' · canonical-name detection (prompt/filename)':'');
+  box.innerHTML='';
+  if(!items.length){emp.style.display='block';
+   const a=AUTO.find(x=>sel.type==='auto'&&x.id===sel.id);
+   emp.textContent=a&&a.none?a.none
+    :sel.type==='char'
+    ?'No video detected for this character — its canonical name must appear in the sidecar prompt or the filename.'
+    :'Empty playlist — add videos from the Gallery (+ button).';
+   return;}
+  const a0=AUTO.find(a=>sel.type==='auto'&&a.id===sel.id);
+  items.forEach((o,i)=>{const d=document.createElement('div');d.className='plitem'+(o.__missing?' plmissing':'');
+   // Auto playlists rank on one metric: show that metric's value, not a rank alone.
+   const mv=o.__v!=null?((a0&&a0.fmt)?a0.fmt(o.__v):o.__v):null;
+   const badge=mv!=null?mv:'#'+(i+1);
+   d.innerHTML=`<img class="plth" loading="lazy" alt="" src="${base()}/thumb?path=${encodeURIComponent(o.path||'')}" onerror="this.style.visibility='hidden'">
+    <span class="plrank">${esc(badge)}</span>
+    <div class="plinfo"><b title="${esc(o.name)}">${esc(o.name)}</b><span>${o.__missing?'⚠ not found on the render host':fmtAgo(o.ts)}</span></div>
+    <div class="plact">${o.__missing?'':'<button data-a="play" title="play from here">▶</button><button data-a="frame" title="Frame Studio"><svg class="ico" aria-hidden="true"><use href="#i-image"/></svg></button>'}${isU?'<button data-a="up" title="move up">↑</button><button data-a="down" title="move down">↓</button><button data-a="rm" title="remove">✕</button>':''}</div>`;
+   d.querySelector('.plth').addEventListener('click',()=>{if(!o.__missing)Gal.open(o,items.filter(x=>!x.__missing),{auto:true});});
+   d.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const a=b.dataset.a;
+    if(a==='play')Gal.open(o,items.filter(x=>!x.__missing),{auto:true});
+    else if(a==='frame')FS.open(o);
+    else if(a==='up'||a==='down'||a==='rm'){const ls=load();const p=ls.find(x=>x.id===sel.id);if(!p)return;
+     if(a==='rm')p.items.splice(i,1);
+     else{const j=a==='up'?i-1:i+1;if(j<0||j>=p.items.length)return;
+      const t=p.items[i];p.items[i]=p.items[j];p.items[j]=t;}
+     save(ls);renderSide();renderMain();}});
+   box.appendChild(d);});}
+ function pick(o){if(!o)return;wirePick();pickM=null;pickO=o;$('ppName').textContent=o.name||'—';renderPick();$('ppOvl').classList.add('show');}
+ function pickMany(arr){arr=(arr||[]).filter(o=>o&&o.path);if(!arr.length)return;wirePick();
+  pickO=null;pickM=arr;$('ppName').textContent=arr.length+' video'+(arr.length>1?'s':'')+' selected'+(arr.length>1?'s':'');
+  renderPick();$('ppOvl').classList.add('show');}
+ function closePick(){$('ppOvl').classList.remove('show');pickO=null;pickM=null;}
+ function renderPick(){const box=$('ppList');const ls=load();
+  box.innerHTML=ls.length?'':'<div style="font-size:var(--fs-xs);opacity:.55;padding:4px 2px">No playlist — create one below.</div>';
+  ls.forEach(p=>{const has=pickO&&(p.items||[]).some(it=>it.path===pickO.path);
+   const inN=pickM?pickM.filter(o=>(p.items||[]).some(it=>it.path===o.path)).length:0;
+   const d=document.createElement('div');d.className='plrow';
+   d.innerHTML=rowHtml(p.emoji||'🎬',p.name,(p.items||[]).length,
+    pickM?(inN?'<span class="plauto">'+inN+' already ✓</span>':''):(has?'<span class="plauto">already ✓</span>':''));
+   d.addEventListener('click',()=>{const ls2=load();const q=ls2.find(x=>x.id===p.id);if(!q)return;
+    if(pickM){let n=0;pickM.forEach(o=>{if(!(q.items||[]).some(it=>it.path===o.path)){
+      q.items.push({path:o.path,name:o.name,url:o.url,kind:o.kind});n++;}});
+     save(ls2);toast(n?('✓ '+n+' added'+(n>1?'s':'')+' to "'+q.name+' »'):('All already in "'+q.name+' »'),n?'ok':'info',1900);}
+    else if(pickO){
+     if((q.items||[]).some(it=>it.path===pickO.path)){
+      q.items=q.items.filter(it=>it.path!==pickO.path);save(ls2);toast('Removed from "'+q.name+' »','info',1700);}
+     else{q.items.push({path:pickO.path,name:pickO.name,url:pickO.url,kind:pickO.kind});save(ls2);toast('✓ Added to "'+q.name+' »','ok',1700);}}
+    else return;
+    renderPick();renderSide();if(sel&&sel.type==='user'&&sel.id===p.id)renderMain();});
+   box.appendChild(d);});}
+ return{init,pick,pickMany,closePick};
+})();
+
+
+/* ══════════════ exports globaux + branchements ══════════════ */
+window.Voice=Voice;window.Gal=Gal;window.FS=FS;window.PL=PL;window.toast=toast;
+
+/* ── V2.3: collapsible rail + image drop on the Sequence tab (-> keyframe = i2v) ── */
+(function(){const b=document.getElementById('railToggle');if(!b)return;
+ const g=()=>{const mini=document.documentElement.classList.contains('rail-mini');
+  b.textContent=mini?'⟩':'⟨';b.title=mini?'Expand the rail':'Collapse the rail';};
+ b.addEventListener('click',()=>{const mini=document.documentElement.classList.toggle('rail-mini');
+  try{localStorage.setItem('phos_rail',mini?'mini':'full')}catch(_){}
+  g();});
+ g();})();
+(function(){const v=document.getElementById('ltx');if(!v)return;
+ let n=0;
+ v.addEventListener('dragenter',e=>{if(!e.dataTransfer)return;n++;v.classList.add('dropping');e.preventDefault();});
+ v.addEventListener('dragover',e=>{e.preventDefault();});
+ v.addEventListener('dragleave',()=>{if(--n<=0){n=0;v.classList.remove('dropping');}});
+ v.addEventListener('drop',e=>{n=0;v.classList.remove('dropping');
+  const f=[...((e.dataTransfer&&e.dataTransfer.files)||[])].find(x=>/^image\//.test(x.type));
+  if(!f)return;e.preventDefault();
+  try{lxSetMode('keyframe');
+   const dt=new DataTransfer();dt.items.add(f);
+   document.getElementById('lxKfStart').files=dt.files;
+   toast('🖼 « '+f.name+'" loaded as the start frame (i2v) — describe the motion then start.','ok',3400);
+   document.getElementById('lxPrompt').focus();
+  }catch(err){toast('✗ drop : '+err.message,'err');}});})();
+/* ── ⟁ Budget panel — how the recent renders sit against the 16 GB budget.
+      Every figure comes from the sidecar: frames x width x height, and the
+      render time the backend recorded. Nothing is estimated. ── */
+const BalancePanel=(()=>{
+ function ensure(){let el=document.getElementById('balPanel');
+  if(!el){const host=document.getElementById('dash');if(!host)return null;
+   el=document.createElement('div');el.id='balPanel';host.prepend(el);}
+  return el;}
+ function row(level,name,count,total,color){const pct=total?Math.round(count/total*100):0;
+  return '<div class="tbrow"><span class="tbn"><span class="dot '+level+'"></span> '+esc(name)+'</span>'
+   +'<div class="tbg"><i style="width:'+pct+'%;background:'+color+'"></i></div>'
+   +'<b class="tbv">'+count+'</b></div>';}
+ async function render(){const el=ensure();if(!el)return;
+  let outs=[];try{outs=await Outputs.get(false)}catch(_){el.innerHTML='';return;}
+  const vids=outs.filter(o=>o.kind==='video').slice(0,60).map(o=>({o,m:metrics(o)})).filter(x=>x.m.px>0);
+  if(vids.length<3){el.innerHTML='';return;}
+  const band={ok:0,warn:0,bad:0};
+  vids.forEach(x=>{const l=budgetLevel(x.m.px,x.m.mode);if(band[l]!==undefined)band[l]++;});
+  const single=band.ok+band.warn+band.bad;
+  const pct=single>=3?Math.round(band.ok/single*100):null;
+  const withStep=vids.filter(x=>x.m.sps>0);
+  const avgSps=withStep.length?withStep.reduce((a,x)=>a+x.m.sps,0)/withStep.length:0;
+  // A percentage over one or two clips says nothing; describe the bands
+  // instead, and only generalise once there is a sample to generalise from.
+  const verdict=single===0
+   ?'every clip here was chained in Long mode, so the per-pass budget has nothing to measure'
+   :single<3
+   ?(band.bad?band.bad+' single-pass render'+(band.bad>1?'s':'')+' past the budget'
+     :band.warn?band.warn+' single-pass render'+(band.warn>1?'s':'')+' in the tight band'
+     :'the single-pass renders sit inside the budget')
+   :pct>=80?'the budget is holding'
+   :pct>=50?'half the single-pass renders push past the comfortable range'
+   :'⚠ most single-pass renders swap — expect ~9x the cost per step';
+  const heavy=vids.slice().sort((a,b)=>b.m.px-a.m.px).slice(0,5);
+  const chained=vids.length-single;
+  el.innerHTML='<div class="tbhead"><span>⟁ Budget · 16 GB</span><b class="tbpct">'+(pct===null?String(single||'—'):pct+'%')+'</b>'
+   +'<span class="tbsub">'+(single===0?'no single-pass render'
+     :pct===null?'single-pass render'+(single>1?'s':'')+' measured'
+     :'of '+single+' single-pass renders within budget')
+   +(chained?' · '+chained+' chained':'')+(avgSps?' · '+avgSps.toFixed(1)+' s/step avg':'')+'</span></div>'
+   +row('ok','\u2264 '+BUDGET_OK+' M px-frames',band.ok,single,'var(--accent2)')
+   +row('warn','\u2264 '+BUDGET_WARN+' M px-frames',band.warn,single,'#ff9d00')
+   +row('bad','> '+BUDGET_WARN+' M px-frames',band.bad,single,'var(--c-break)')
+   +(chained?row('chained','chained · Long mode',chained,vids.length,'var(--accent)'):'')
+   +'<div class="tbverdict">'+esc(verdict)+'.</div>'
+   +'<div class="hlreg"><span>⟁ Heaviest</span>'+heavy.map(x=>'<button class="hlchip" title="'+x.m.px.toFixed(0)+' M pixel-frames">'+esc((x.o.name||'').slice(0,22))+'</button>').join('')+'</div>';
+  el.querySelectorAll('.hlchip').forEach((c,i)=>c.addEventListener('click',()=>Gal.open(heavy[i].o,heavy.map(x=>x.o))));}
+ return{render};})();
+window.BalancePanel=BalancePanel;
+/* ── ⟁ Emergency stop: stop the render + clear the queue + sleep the LLM ── */
+(function(){const b=document.getElementById('emergencyBtn');if(!b)return;
+ b.addEventListener('click',async()=>{
+  if(!confirm('⟁ Emergency stop:\n• stop the running render\n• clear the queue\n• sleep the LLM\n\nTrigger it?'))return;
+  b.classList.add('busy');b.disabled=true;
+  const steps=[['/stop','render stopped'],['/queue/clear','queue cleared'],['/llm/sleep','LLM endormi']];
+  let ok=0;
+  for(const[p,label] of steps){
+   try{const r=await fetch(base()+p,{method:'POST',headers:H});
+    if(r.ok){ok++;toast('⟁ '+label,'ok',1600);}else toast('✗ '+p+' : HTTP '+r.status,'warn',2200);}
+   catch(e){toast('✗ '+p+' : '+e.message,'err',2400);}}
+  b.classList.remove('busy');b.disabled=false;b.removeAttribute('aria-busy');
+  toast(ok===3?'Emergency stop complete — the machine can breathe.':'Partial stop ('+ok+'/3) — check the proxy.',ok===3?'ok':'warn',3400);});})();
+Voice.attach(document.getElementById('lxPrompt'),{title:'Dictate the video prompt (V)'});
+Voice.attach(document.getElementById('igPrompt'),{title:'Dictate the image prompt (V)'});
+document.getElementById('micLangTop').addEventListener('click',()=>Voice.toggleLang());
+// LLM chips under the LTX prompt: translation (engine) + active pack routes.
+(function(){const ta=document.getElementById('lxPrompt');if(!ta)return;
+ const row=document.createElement('div');row.className='chips';row.style.margin='6px 0 0';
+ const mk=(label,route,titre)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=label;b.title=titre;
+  b.addEventListener('click',async()=>{const txt=ta.value.trim();
+   if(!txt){toast('Write or dictate an idea first (mic button, or the V key).','warn');return;}
+   const old=b.textContent;b.disabled=true;b.setAttribute('aria-busy','true');
+   try{ta.value=await llmRoute(route,txt);ta.dispatchEvent(new Event('input',{bubbles:true}));toast(label+' ✓','ok',1800);}
+   catch(e){toast('✗ '+e.message,'err');}
+   finally{b.disabled=false;b.removeAttribute('aria-busy');b.textContent=old;}});
+  row.appendChild(b);};
+ mk('🎬 Format LTX','/ltx','Reformat the idea to the LTX-Video standard (local LLM)');
+ mk('→ EN','/translate','Translate the dictation into LTX English (local LLM)');
+ // Extra routes served by the active style pack, when there is one.
+ fetch(base()+'/transforms',{headers:H}).then(r=>r.ok?r.json():null).then(d=>{
+  if(!d)return;(d.transforms||[]).filter(x=>!x.builtin).forEach(x=>mk(x.label,x.route,x.pending||x.label));
+ }).catch(()=>{});
+ const wrap=ta.closest('.micwrap')||ta;wrap.parentNode.insertBefore(row,wrap.nextSibling);})();
+// ── Grid fitting ──────────────────────────────────────────────────────────
+// `repeat(auto-fit, minmax(...))` picks the most columns that fit, which leaves
+// the last row ragged whenever the item count is not a multiple of it. Choose
+// the count that empties the fewest cells, inside the tile-size band.
+const FITTED = [
+  { sel: '.ggrid',          min: 300, max: 560, gap: 16 },
+  { sel: '.plitems',        min: 228, max: 420, gap: 12 },
+  { sel: '.ig-right .grid', min: 228, max: 420, gap: 16 },   // 260 forced 2+1 on three images in a 770px column
+];
+function bestColumns(n, w, { min, max, gap }) {
+  if (!n || w <= 0) return 0;
+  const fit = c => (w - (c - 1) * gap) / c;                 // tile width at c columns
+  const lo = Math.max(1, Math.ceil((w + gap) / (max + gap)));  // else tiles overshoot max
+  const hi = Math.max(lo, Math.floor((w + gap) / (min + gap)));
+  let best = lo, bestEmpty = Infinity;
+  for (let c = lo; c <= hi; c++) {
+    if (c > lo && fit(c) < min) break;
+    const empty = Math.ceil(n / c) * c - n;
+    if (empty < bestEmpty) { bestEmpty = empty; best = c; }   // ties keep the wider tile
+  }
+  return Math.min(best, Math.max(n, lo));
+}
+function fitGrids(root) {
+  (root || document).querySelectorAll(FITTED.map(f => f.sel).join(',')).forEach(el => {
+    const cfg = FITTED.find(f => el.matches(f.sel));
+    if (!cfg || !el.offsetParent) return;
+    const n = [...el.children].filter(c => c.offsetParent !== null || c.getClientRects().length).length;
+    const c = bestColumns(n, el.clientWidth, cfg);
+    el.style.gridTemplateColumns = c ? `repeat(${c}, minmax(0, 1fr))` : '';
+  });
+}
+let fitT = null;
+const fitSoon = () => { clearTimeout(fitT); fitT = setTimeout(() => fitGrids(), 60); };
+addEventListener('resize', fitSoon);
+addEventListener('load', fitSoon);
+new MutationObserver(fitSoon).observe(document.body, { childList: true, subtree: true });
+fitSoon();
+
+// Close the ⚙︎ popover on an outside click.
+document.addEventListener('click',e=>{const c=document.getElementById('cfgPop');
+ if(c&&c.open&&!c.contains(e.target))c.open=false;});
+</script>
+</body></html>

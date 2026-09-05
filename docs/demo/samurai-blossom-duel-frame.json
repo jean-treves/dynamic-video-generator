@@ -1,0 +1,13 @@
+{
+  "prompt": "",
+  "description": "Two swordsmen mid-clash in silhouette against blossom.",
+  "width": 768,
+  "height": 416,
+  "frames": 1,
+  "fps": 24,
+  "duration_s": 0,
+  "audio": false,
+  "backend": "LTX-Video 2.3 (MLX)",
+  "mode": "frame",
+  "note": "frame extracted at 11.5s from samurai-blossom-duel.mp4 \u2014 not a separate render"
+}

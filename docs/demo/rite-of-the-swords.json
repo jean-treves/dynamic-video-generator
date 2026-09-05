@@ -1,0 +1,14 @@
+{
+  "prompt": "",
+  "description": "A winged figure at the centre of a symmetrical rite, robed onlookers, volumetric light.",
+  "width": 768,
+  "height": 384,
+  "frames": 168,
+  "fps": 24,
+  "duration_s": 7.01,
+  "audio": true,
+  "backend": "LTX-Video 2.3 (MLX)",
+  "note": "recovered clip: prompt, step count and render time were not preserved",
+  "mode": "t2v",
+  "mode_source": "deduced from the load: 50 M fits a single pass"
+}

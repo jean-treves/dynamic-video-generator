@@ -1,0 +1,36 @@
+[project]
+name = "dynamic-video-generator"
+version = "0.1.0"
+description = "Fully local multimodal generation gateway: a same-origin proxy in front of LTX-Video, Draw Things and Ollama."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Jean Treves" }]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.16"]
+
+[project.scripts]
+dvg = "dynamic_video_generator.proxy:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dynamic_video_generator"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+# Correctness only, deliberately not style. F821 is the one that earns its
+# keep: the handler is split across mixins, so a lost import fails on the one
+# route that uses it and nothing else would catch that before a user does.
+select = ["F", "E9"]

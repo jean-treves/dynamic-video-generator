@@ -1,0 +1,296 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Dynamic Video Generator",
+    "locale": "en",
+    "output": "architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1180,
+      640
+    ],
+    "views": [
+      {
+        "id": "one-origin",
+        "label": "One origin",
+        "focus": [
+          "browser",
+          "proxy",
+          "ltx",
+          "drawthings",
+          "ollama"
+        ],
+        "note": "The browser reaches a single origin; the three engines stay on loopback behind it."
+      },
+      {
+        "id": "backend-gone",
+        "label": "Render machine gone",
+        "focus": [
+          "proxy",
+          "ltx",
+          "demo"
+        ],
+        "note": "With LTX unreachable the proxy answers from the renders committed in the repository."
+      },
+      {
+        "id": "discovery",
+        "label": "Tunnel discovery",
+        "focus": [
+          "browser",
+          "tunnel",
+          "firebase",
+          "proxy"
+        ],
+        "note": "The tunnel publishes its URL; the client reads it back instead of being configured by hand."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Studio UI",
+      "sublabel": "generator · gallery · doc",
+      "pos": [
+        40,
+        285
+      ],
+      "size": [
+        160,
+        72
+      ]
+    },
+    {
+      "id": "firebase",
+      "type": "cloud",
+      "label": "Firebase RTDB",
+      "sublabel": "endpoint directory",
+      "pos": [
+        40,
+        60
+      ],
+      "size": [
+        160,
+        68
+      ],
+      "tag": "optional"
+    },
+    {
+      "id": "tunnel",
+      "type": "cloud",
+      "label": "Cloudflare / ngrok",
+      "sublabel": "public entry",
+      "pos": [
+        270,
+        165
+      ],
+      "size": [
+        160,
+        68
+      ],
+      "tag": "optional"
+    },
+    {
+      "id": "packs",
+      "type": "database",
+      "label": "packs/",
+      "sublabel": "prompts · corpus · cipher",
+      "pos": [
+        500,
+        60
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "proxy",
+      "type": "backend",
+      "label": "dvg proxy",
+      "sublabel": "ThreadingHTTPServer :8200",
+      "pos": [
+        500,
+        285
+      ],
+      "size": [
+        170,
+        76
+      ],
+      "tag": "serves the pages too"
+    },
+    {
+      "id": "demo",
+      "type": "database",
+      "label": "docs/demo/",
+      "sublabel": "committed LTX renders",
+      "pos": [
+        500,
+        500
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "ltx",
+      "type": "backend",
+      "label": "Phosphene · LTX-Video",
+      "sublabel": "127.0.0.1:8198",
+      "pos": [
+        830,
+        60
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "tag": "16 GB budget"
+    },
+    {
+      "id": "drawthings",
+      "type": "backend",
+      "label": "Draw Things",
+      "sublabel": "127.0.0.1:7860",
+      "pos": [
+        830,
+        285
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "ollama",
+      "type": "backend",
+      "label": "Ollama",
+      "sublabel": "127.0.0.1:11434",
+      "pos": [
+        830,
+        500
+      ],
+      "size": [
+        190,
+        76
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Render machine — every engine bound to 127.0.0.1",
+      "wraps": [
+        "packs",
+        "proxy",
+        "demo",
+        "ltx",
+        "drawthings",
+        "ollama"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "refuses non-loopback callers",
+      "wraps": [
+        "ltx"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser-to-proxy",
+      "from": "browser",
+      "to": "proxy",
+      "label": "same origin · no CORS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "tunnel-to-proxy",
+      "from": "tunnel",
+      "to": "proxy",
+      "label": "public entry",
+      "variant": "security"
+    },
+    {
+      "id": "tunnel-publishes",
+      "from": "tunnel",
+      "to": "firebase",
+      "label": "publishes its URL",
+      "variant": "dashed"
+    },
+    {
+      "id": "browser-discovers",
+      "from": "browser",
+      "to": "firebase",
+      "label": "reads it back",
+      "variant": "dashed"
+    },
+    {
+      "id": "proxy-loads-packs",
+      "from": "proxy",
+      "to": "packs",
+      "label": "loaded at runtime",
+      "variant": "dashed",
+      "labelDx": -50
+    },
+    {
+      "id": "proxy-to-ltx",
+      "from": "proxy",
+      "to": "ltx",
+      "label": "/queue/add · /status",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "proxy-to-drawthings",
+      "from": "proxy",
+      "to": "drawthings",
+      "label": "/dt · txt2img"
+    },
+    {
+      "id": "proxy-to-ollama",
+      "from": "proxy",
+      "to": "ollama",
+      "label": "9 rewrite routes",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "proxy-falls-back",
+      "from": "proxy",
+      "to": "demo",
+      "label": "fallback when LTX is down",
+      "variant": "dashed",
+      "labelDy": 100
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "One origin",
+      "items": [
+        "The browser only ever talks to the proxy on :8200",
+        "LTX, Draw Things and Ollama never leave 127.0.0.1"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Three engines, one contract",
+      "items": [
+        "LTX-Video renders through /queue/add and reports on /status",
+        "Draw Things sits behind /dt; Ollama rewrites prompts on nine routes"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "When the render machine is gone",
+      "items": [
+        "/outputs falls back to the LTX renders committed in docs/demo/",
+        "dvg --mock replays recorded responses end to end"
+      ]
+    }
+  ]
+}

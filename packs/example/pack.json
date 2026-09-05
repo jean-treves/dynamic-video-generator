@@ -1,0 +1,28 @@
+{
+  "id": "example",
+  "name": "Example",
+  "description": "Demonstration pack: one style transform, and one with a cipher applied afterwards.",
+  "transforms": {
+    "/noir": {
+      "tag": "NOIR",
+      "system": "prompts/noir.txt",
+      "max_tokens": 900,
+      "temperature": 0.7,
+      "label": "Film noir",
+      "pending": "Restyling as film noir (local LLM)…",
+      "done": "Prompt restyled as film noir"
+    },
+    "/runes": {
+      "tag": "RUNES",
+      "system": "prompts/runes.txt",
+      "max_tokens": 200,
+      "temperature": 0.3,
+      "cipher": "cipher.json",
+      "label": "Runes",
+      "pending": "Condensing, then transliterating to runes…",
+      "done": "Prompt encoded as runes"
+    }
+  },
+  "overrides": {},
+  "corpus": "corpus.json"
+}

@@ -1,0 +1,13 @@
+{
+  "prompt": "",
+  "description": "The winged figure at the centre of the rite, blades raised.",
+  "width": 768,
+  "height": 384,
+  "frames": 1,
+  "fps": 24,
+  "duration_s": 0,
+  "audio": false,
+  "backend": "LTX-Video 2.3 (MLX)",
+  "mode": "frame",
+  "note": "frame extracted at 3.4s from rite-of-the-swords.mp4 \u2014 not a separate render"
+}

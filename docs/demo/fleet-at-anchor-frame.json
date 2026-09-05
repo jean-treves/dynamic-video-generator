@@ -1,0 +1,13 @@
+{
+  "prompt": "",
+  "description": "The fleet at anchor under drifting cloud, mirror-still water.",
+  "width": 768,
+  "height": 416,
+  "frames": 1,
+  "fps": 24,
+  "duration_s": 0,
+  "audio": false,
+  "backend": "LTX-Video 2.3 (MLX)",
+  "mode": "frame",
+  "note": "frame extracted at 6.0s from fleet-at-anchor.mp4 \u2014 not a separate render"
+}
